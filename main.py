@@ -50,27 +50,31 @@ def check_knowledge(user_input):
     normalized_input = normalize_text(user_input)
 
     if not normalized_input:
-        return None
+        return None, []
 
     for item in data["knowledge"]:
         if normalize_text(item["pattern"]) == normalized_input:
-            return item["response"]
+            return item["response"], []
 
-    best_match = None
-    highest_score = 0
+    best_matches = []
+    scores = []
 
     for item in data["knowledge"]:
         pattern = normalize_text(item["pattern"])
         score = similar(normalized_input, pattern)
+        best_matches.append((item, score))
+        scores.append(score)
 
-        if score > highest_score:
-            highest_score = score
-            best_match = item
+    # Sort by score and get top 3 matches
+    best_matches.sort(key=lambda x: x[1], reverse=True)
+    top_matches = best_matches[:3]
 
-    if highest_score > 0.88:
-        return best_match["response"]
+    if top_matches[0][1] > 0.88:
+        return top_matches[0][0]["response"], []
 
-    return None
+    # Return partial matches as context for LLM
+    context_matches = [item for item, score in top_matches if score > 0.5]
+    return None, context_matches
 
 def try_math(user_input):
     match = re.search(r'(\d+\s*[\+\-\*\/]\s*\d+)', user_input)
@@ -84,22 +88,34 @@ def try_math(user_input):
     return None
 
 def respond(user_input):
-
-     
+    # Try math first
     math_answer = try_math(user_input)
     if math_answer:
         return math_answer
 
-     
-    stored = check_knowledge(user_input)
-    if stored:
-        return stored
+    # Check knowledge base
+    stored_response, context_matches = check_knowledge(user_input)
+    if stored_response:
+        return stored_response
 
-   
+    # Generate response with LLM using context if available
     try:
-        ai_response = model.invoke(user_input)
+        if context_matches:
+            # Build context from partial matches
+            context_text = "Related knowledge:\n"
+            for match in context_matches:
+                context_text += f"- Q: {match['pattern'][:80]}\n  A: {match['response'][:150]}\n"
+            
+            # Prompt the LLM with context
+            prompt = f"{context_text}\nBased on the above context and your knowledge, answer: {user_input}"
+            ai_response = model.invoke(prompt)
+        else:
+            # Direct response without context
+            ai_response = model.invoke(user_input)
+        
         return ai_response.strip()
-    except:
+    except Exception as e:
+        print(f"[LLM Error: {str(e)}]")
         return None
 
 
