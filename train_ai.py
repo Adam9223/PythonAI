@@ -1,59 +1,62 @@
 from datasets import load_dataset
 import json
-import random
+import re
 
-# Load the dataset
-print("Loading dataset from Hugging Face...")
-dataset = load_dataset("Roman1111111/gemini-3-pro-10000x-hard-high-reasoning", split="train")
+# Load the wikitext dataset
+print("Loading Salesforce wikitext-103-v1 dataset from Hugging Face...")
+ds = load_dataset("Salesforce/wikitext", "wikitext-103-v1")
 
-print(f"Dataset loaded: {len(dataset)} rows")
+# Use the train split
+dataset = ds['train']
+print(f"Dataset loaded: {len(dataset)} articles")
 
-# Load existing knowledge
-with open("knowledge.json", "r") as f:
-    knowledge_data = json.load(f)
+# Create articles database
+print(f"\nProcessing all {len(dataset)} articles for context database...")
+print("This may take a while. Progress will be shown every 50,000 articles.\n")
 
-existing_count = len(knowledge_data["knowledge"])
-print(f"Existing knowledge entries: {existing_count}")
+articles = []
+skipped = 0
 
-# Extract Q&A pairs - take a sample for lightweight training
-# For dev-interns, we'll use 100 samples to keep it light
-sample_size = 100
-sample_indices = random.sample(range(len(dataset)), min(sample_size, len(dataset)))
-
-print(f"\nExtracting {len(sample_indices)} training pairs...")
-
-new_entries = []
-for idx in sample_indices:
-    item = dataset[idx]
+for idx in range(len(dataset)):
+    text = dataset[idx]['text'].strip()
     
-    # Extract question from original_data
-    question = item['original_data']['text'].strip()
+    # Progress indicator
+    if (idx + 1) % 50000 == 0:
+        print(f"Progress: {idx + 1}/{len(dataset)} articles | Stored: {len(articles)} | Skipped: {skipped}")
     
-    # Extract answer from model_response
-    answer = item['model_response'].strip()
+    # Skip empty or very short texts
+    if len(text) < 200:
+        skipped += 1
+        continue
     
-    # Truncate very long responses for lightweight model
-    if len(answer) > 500:
-        # Take first 500 chars and add continuation indicator
-        answer = answer[:497] + "..."
+    # Extract title (usually appears at start, often with = symbols)
+    title_match = re.search(r'= (.+?) =', text)
+    title = title_match.group(1).strip() if title_match else None
     
-    # Create knowledge entry
-    entry = {
-        "pattern": question[:200],  # Limit question length too
-        "response": answer
+    # Skip if no title found (likely not a proper article)
+    if not title or len(title) < 3:
+        skipped += 1
+        continue
+    
+    # Clean up the text but keep full content
+    cleaned_text = re.sub(r'\n\n+', '\n\n', text)  # Normalize paragraph breaks
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)  # Normalize whitespace
+    
+    # Store article with title and content
+    article = {
+        "title": title,
+        "content": cleaned_text
     }
-    
-    new_entries.append(entry)
+    articles.append(article)
 
-# Add new entries to knowledge
-knowledge_data["knowledge"].extend(new_entries)
+print(f"\nProcessing complete!")
+print(f"  Total articles stored: {len(articles)}")
+print(f"  Articles skipped: {skipped}")
 
-# Save updated knowledge
-with open("knowledge.json", "w") as f:
-    json.dump(knowledge_data, f, indent=2)
+# Save articles database
+with open("articles_db.json", "w") as f:
+    json.dump({"articles": articles}, f, indent=2)
 
-print(f"\n✓ Training complete!")
-print(f"  Previous entries: {existing_count}")
-print(f"  New entries: {len(new_entries)}")
-print(f"  Total entries: {len(knowledge_data['knowledge'])}")
-print(f"\nKnowledge base saved to knowledge.json")
+print(f"\n✓ Articles database saved to articles_db.json")
+print(f"  File size: {len(json.dumps(articles)) / (1024*1024):.2f} MB")
+print(f"\nThe AI will now use these articles to provide context-based responses!")

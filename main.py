@@ -5,11 +5,15 @@ import sys
 import time
 import threading
 from difflib import SequenceMatcher
-from langchain_ollama import OllamaLLM
 
 FILE_NAME = "knowledge.json"
+ARTICLES_DB = "articles_db.json"
 
-model = OllamaLLM(model="llama3:latest")
+# Global cache for articles database
+articles_cache = None
+
+print("AI Assistant - Retrieval-Augmented Generation System")
+print("Using tokenized Wikipedia corpus for context-aware responses\n")
 
 
 class LoadingAnimation:
@@ -82,6 +86,61 @@ def combined_similarity(text1, text2):
     
     # Weight: 60% token similarity, 40% string similarity
     return 0.6 * token_sim + 0.4 * string_sim
+
+
+def load_articles_db():
+    """Load the Wikipedia articles database"""
+    global articles_cache
+    
+    if articles_cache is not None:
+        return articles_cache
+    
+    if not os.path.exists(ARTICLES_DB):
+        return {"articles": []}
+    
+    print("[Loading articles database...]")
+    with open(ARTICLES_DB, "r") as f:
+        articles_cache = json.load(f)
+    print(f"[Loaded {len(articles_cache.get('articles', []))} articles]\n")
+    return articles_cache
+
+
+def search_articles(query, max_results=3):
+    """Search through articles database for relevant context"""
+    db = load_articles_db()
+    articles = db.get("articles", [])
+    
+    if not articles:
+        return []
+    
+    query_tokens = set(tokenize(query))
+    if not query_tokens:
+        return []
+    
+    # Score each article based on relevance
+    scored_articles = []
+    
+    for article in articles:
+        title = article.get("title", "")
+        content = article.get("content", "")[:1000]  # First 1000 chars for scoring
+        
+        # Calculate title match
+        title_sim = combined_similarity(query, title)
+        
+        # Calculate content token overlap
+        content_tokens = set(tokenize(content))
+        token_overlap = len(query_tokens.intersection(content_tokens))
+        token_score = token_overlap / len(query_tokens) if query_tokens else 0
+        
+        # Combined score: 70% title, 30% content
+        score = 0.7 * title_sim + 0.3 * token_score
+        
+        if score > 0.1:  # Minimum threshold
+            scored_articles.append((article, score))
+    
+    # Sort by score and return top results
+    scored_articles.sort(key=lambda x: x[1], reverse=True)
+    return [article for article, score in scored_articles[:max_results]]
 
 
 def load_knowledge():
@@ -162,54 +221,140 @@ def try_math(user_input):
             return None
     return None
 
+def format_natural_response(context_parts, query):
+    """Format retrieved context into a natural, ChatGPT-like response"""
+    # Clean up all context parts
+    cleaned_parts = []
+    for part in context_parts:
+        # Remove tokenization artifacts
+        clean = re.sub(r'@\.@', '.', part)
+        clean = re.sub(r'@-@', '-', clean)
+        clean = re.sub(r'<unk>', '', clean)
+        clean = re.sub(r'\s+', ' ', clean).strip()
+        cleaned_parts.append(clean)
+    
+    # Take only the first context part (most relevant)
+    if not cleaned_parts:
+        return "I found some information but couldn't format it properly."
+    
+    main_context = cleaned_parts[0]
+    
+    # Extract complete, well-formed sentences
+    sentences = []
+    for s in main_context.split('.'):
+        s = s.strip()
+        # Only keep sentences that are substantial and start with uppercase
+        if len(s) > 40 and s and s[0].isupper():
+            sentences.append(s + '.')
+    
+    if not sentences:
+        # Fallback: just clean and truncate the context
+        return main_context[:300] + "..." if len(main_context) > 300 else main_context
+    
+    # Use up to 2 complete sentences for a concise response
+    content = ' '.join(sentences[:2])
+    
+    # If too long, truncate to reasonable length
+    if len(content) > 500:
+        content = content[:497] + "..."
+    
+    # Add a natural conversational intro based on query type
+    query_lower = query.lower()
+    if any(word in query_lower for word in ['what is', 'what are', 'define']):
+        # Definitional question
+        response = content
+    elif any(word in query_lower for word in ['tell me', 'explain', 'describe']):
+        # Explanatory question
+        response = content
+    elif any(word in query_lower for word in ['how', 'why']):
+        # Process question
+        response = content
+    else:
+        # General query
+        response = content
+    
+    return response
+
+
+def extract_relevant_text(content, query_tokens, max_length=500):
+    """Extract the most relevant section from article content"""
+    # Split content into sentences
+    sentences = re.split(r'[.!?]\s+', content)
+    
+    # Score each sentence by token overlap
+    scored_sentences = []
+    for sentence in sentences:
+        if len(sentence) < 20:  # Skip very short sentences
+            continue
+        sentence_tokens = set(tokenize(sentence))
+        overlap = len(query_tokens.intersection(sentence_tokens))
+        if overlap > 0:
+            scored_sentences.append((sentence, overlap))
+    
+    # Sort by relevance and take top sentences
+    scored_sentences.sort(key=lambda x: x[1], reverse=True)
+    
+    # Build response from top sentences
+    result = []
+    current_length = 0
+    for sentence, score in scored_sentences[:5]:  # Top 5 sentences
+        if current_length + len(sentence) > max_length:
+            break
+        result.append(sentence)
+        current_length += len(sentence)
+    
+    return '. '.join(result) + '.' if result else content[:max_length]
+
+
 def respond(user_input):
     # Try math first
     math_answer = try_math(user_input)
     if math_answer:
         return math_answer
 
-    # Check knowledge base
+    # Check knowledge base first (for greetings and saved knowledge)
     stored_response, context_matches = check_knowledge(user_input)
     if stored_response:
         return stored_response
 
-    # If we have context matches, try to provide a helpful response
+    # Search Wikipedia articles database for relevant context
+    relevant_articles = search_articles(user_input, max_results=3)
+    
+    if relevant_articles:
+        query_tokens = set(tokenize(user_input))
+        
+        # Extract relevant text from top articles
+        context_parts = []
+        for article in relevant_articles[:2]:  # Use top 2 articles
+            relevant_text = extract_relevant_text(article['content'], query_tokens, max_length=400)
+            context_parts.append(relevant_text)
+        
+        # Format into a natural, conversational response
+        natural_response = format_natural_response(context_parts, user_input)
+        return natural_response
+    
+    # If we have context matches from knowledge base, use them
     if context_matches:
-        # Show related knowledge to user as a fallback
         context_response = "Based on related knowledge:\n"
         for i, match in enumerate(context_matches[:2], 1):
             context_response += f"\n{i}. {match['response'][:200]}"
             if len(match['response']) > 200:
                 context_response += "..."
-        
-        # Try to generate with LLM using context
-        try:
-            context_text = "Related knowledge:\n"
-            for match in context_matches:
-                context_text += f"- Q: {match['pattern'][:80]}\n  A: {match['response'][:150]}\n"
-            
-            prompt = f"{context_text}\nBased on the above context and your knowledge, answer: {user_input}"
-            ai_response = model.invoke(prompt)
-            return ai_response.strip()
-        except Exception as e:
-            # If LLM fails, return the context-based response as fallback
-            print(f"[Note: Using knowledge base context, LLM unavailable]")
-            return context_response
+        return context_response
     
-    # Try direct LLM without context as last resort
-    try:
-        ai_response = model.invoke(user_input)
-        return ai_response.strip()
-    except Exception as e:
-        # Only return None if we truly have nothing
-        return None
+    # No relevant context found
+    return None
 
 
  
 
 def main():
-    print("AI Assistant Started (Trained on 147+ knowledge entries)")
+    print("AI Assistant Started")
+    print("Using tokenized Wikipedia corpus with natural language formatting")
     print("Type 'exit' to quit.\n")
+    
+    # Preload articles database
+    load_articles_db()
 
     while True:
         user_input = input("You: ")
