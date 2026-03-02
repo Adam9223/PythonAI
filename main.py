@@ -98,24 +98,35 @@ def respond(user_input):
     if stored_response:
         return stored_response
 
-    # Generate response with LLM using context if available
-    try:
-        if context_matches:
-            # Build context from partial matches
+    # If we have context matches, try to provide a helpful response
+    if context_matches:
+        # Show related knowledge to user as a fallback
+        context_response = "Based on related knowledge:\n"
+        for i, match in enumerate(context_matches[:2], 1):
+            context_response += f"\n{i}. {match['response'][:200]}"
+            if len(match['response']) > 200:
+                context_response += "..."
+        
+        # Try to generate with LLM using context
+        try:
             context_text = "Related knowledge:\n"
             for match in context_matches:
                 context_text += f"- Q: {match['pattern'][:80]}\n  A: {match['response'][:150]}\n"
             
-            # Prompt the LLM with context
             prompt = f"{context_text}\nBased on the above context and your knowledge, answer: {user_input}"
             ai_response = model.invoke(prompt)
-        else:
-            # Direct response without context
-            ai_response = model.invoke(user_input)
-        
+            return ai_response.strip()
+        except Exception as e:
+            # If LLM fails, return the context-based response as fallback
+            print(f"[Note: Using knowledge base context, LLM unavailable]")
+            return context_response
+    
+    # Try direct LLM without context as last resort
+    try:
+        ai_response = model.invoke(user_input)
         return ai_response.strip()
     except Exception as e:
-        print(f"[LLM Error: {str(e)}]")
+        # Only return None if we truly have nothing
         return None
 
 
