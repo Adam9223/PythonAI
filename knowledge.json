@@ -3,6 +3,22 @@
         {
             "pattern": "Hi I am Adam",
             "response": "Hi Adam! How can I assist you today?"
+        },
+        {
+            "pattern": "Where Does Adam Live",
+            "response": "Lives on the skies"
+        },
+        {
+            "pattern": "Adam Where do you live",
+            "response": "Sky"
+        },
+        {
+            "pattern": "Who is trump",
+            "response": "A US president"
+        },
+        {
+            "pattern": "Where is that?",
+            "response": "I don't know"
         }
     ]
 }
