@@ -589,8 +589,12 @@
             "response": "To integrate Kaldor\u2019s Verdoorn Law into a model of regional divergence, we must move beyond neoclassical equilibrium and embrace the **Principle of Cumulative Causation**. In this Post-Keynesian framework, growth is demand-led, and productivity is endogenous.\n\n### I. The Structural Equations\n\nWe define a two-region model (Region 1: The Core; Region 2: The Periphery).\n\n1.  **The Verdoorn Law (Productivity Growth):**\n    Productivity growth ($p$) is an increasing function of output growth ($y$)..."
         },
         {
-            "pattern": "test question",
-            "response": "test answer from verification"
+            "pattern": "test",
+            "response": "\u001b[A\u001b[Aexit"
+        },
+        {
+            "pattern": "why is the sky blue",
+            "response": "The sky appears blue because of Rayleigh scattering of short blue wavelengths"
         }
     ]
 }
