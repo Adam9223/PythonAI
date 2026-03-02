@@ -6,12 +6,11 @@ from langchain_ollama import OllamaLLM
 
 FILE_NAME = "knowledge.json"
 
-# Load Ollama model
 model = OllamaLLM(model="llama3:latest")
 
 
 def normalize_text(text):
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", "", text.lower())).strip()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", "", text.lower())). strip()
 
 def load_knowledge():
     if not os.path.exists(FILE_NAME):
@@ -107,7 +106,7 @@ def respond(user_input):
  
 
 def main():
-    print("Memory AI Started")
+    print("AI Assistant Started (Trained on 147+ knowledge entries)")
     print("Type 'exit' to quit.\n")
 
     while True:
