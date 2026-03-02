@@ -1,192 +1,192 @@
 {
-    "knowledge": [
-        {
-            "pattern": "Hi I am Adam",
-            "response": "Hi Adam! How can I assist you today?"
-        },
-        {
-            "pattern": "hello",
-            "response": "Hello! How can I assist you today?"
-        },
-        {
-            "pattern": "Hi",
-            "response": "Hi there! How can I help you today?"
-        },
-        {
-            "pattern": "good morning",
-            "response": "Good morning! Hope your day is off to a great start."
-        },
-        {
-            "pattern": "good afternoon",
-            "response": "Good afternoon! How can I help you right now?"
-        },
-        {
-            "pattern": "good evening",
-            "response": "Good evening! What can I do for you tonight?"
-        },
-        {
-            "pattern": "how are you",
-            "response": "I'm doing well and ready to help. What do you need?"
-        },
-        {
-            "pattern": "what is your name",
-            "response": "I am Memory AI, your assistant."
-        },
-        {
-            "pattern": "who made you",
-            "response": "I was built as a Memory AI assistant and can learn from your inputs."
-        },
-        {
-            "pattern": "thank you",
-            "response": "You're welcome!"
-        },
-        {
-            "pattern": "thanks",
-            "response": "Happy to help!"
-        },
-        {
-            "pattern": "bye",
-            "response": "Goodbye! Have a great day."
-        },
-        {
-            "pattern": "help",
-            "response": "You can chat with me, ask simple math questions, or teach me new responses."
-        },
-        {
-            "pattern": "what can you do",
-            "response": "I can answer from memory, solve simple math, and learn new responses from you."
-        },
-        {
-            "pattern": "what time is it",
-            "response": "I don't track live time yet, but your device clock has the current time."
-        },
-        {
-            "pattern": "what day is it",
-            "response": "I don't track live dates yet, but your device calendar has today's date."
-        },
-        {
-            "pattern": "who are you",
-            "response": "I am Memory AI, a chatbot that can learn from your feedback."
-        },
-        {
-            "pattern": "nice to meet you",
-            "response": "Nice to meet you too!"
-        },
-        {
-            "pattern": "tell me a joke",
-            "response": "Why do programmers prefer dark mode? Because light attracts bugs."
-        },
-        {
-            "pattern": "how do I create a git branch",
-            "response": "Use: git checkout -b branch-name"
-        },
-        {
-            "pattern": "how do I push my changes",
-            "response": "Use: git add . && git commit -m 'message' && git push"
-        },
-        {
-            "pattern": "how do I pull latest changes",
-            "response": "Use: git pull origin main"
-        },
-        {
-            "pattern": "what is a pull request",
-            "response": "A pull request (PR) is a request to merge your branch into main. It allows code review before merging."
-        },
-        {
-            "pattern": "how do I revert a commit",
-            "response": "Use: git revert commit-hash (creates new commit) or git reset --hard commit-hash (removes commits)"
-        },
-        {
-            "pattern": "how do I see my git log",
-            "response": "Use: git log --oneline to see recent commits"
-        },
-        {
-            "pattern": "how do I fix a merge conflict",
-            "response": "Open the conflicted file, remove conflict markers, keep desired code, then git add and commit."
-        },
-        {
-            "pattern": "what is unit testing",
-            "response": "Unit testing verifies individual functions work correctly in isolation before integration."
-        },
-        {
-            "pattern": "how do I run tests",
-            "response": "Check your project's README. Typically: pytest (Python), npm test (Node), or mvn test (Java)."
-        },
-        {
-            "pattern": "what is code review",
-            "response": "Code review is when teammates examine your code for quality, bugs, and best practices before merging."
-        },
-        {
-            "pattern": "how do I debug my code",
-            "response": "Add print statements, use a debugger (pdb for Python), or check logs for error messages."
-        },
-        {
-            "pattern": "what does this error mean",
-            "response": "Copy the full error message and search it online, or ask a mentor. Most errors have clear solutions."
-        },
-        {
-            "pattern": "how do I set up my environment",
-            "response": "Check the project README for setup steps. Usually involves cloning repo, installing dependencies, and running locally."
-        },
-        {
-            "pattern": "how do I install dependencies",
-            "response": "For Python: pip install -r requirements.txt | For Node: npm install | Check project docs for exact command."
-        },
-        {
-            "pattern": "what is a linter",
-            "response": "A linter checks code style and catches errors automatically. Examples: ESLint (JS), Pylint (Python), Checkstyle (Java)."
-        },
-        {
-            "pattern": "what is version control",
-            "response": "Version control (Git) tracks code changes, enables collaboration, and allows reverting to previous versions."
-        },
-        {
-            "pattern": "how do I document my code",
-            "response": "Write clear docstrings/comments explaining what functions do, their parameters, and return values."
-        },
-        {
-            "pattern": "what is a commit message",
-            "response": "A commit message describes changes. Use: git commit -m 'Fix: bug in login flow' or 'Feat: add dark mode'"
-        },
-        {
-            "pattern": "how do I ask for help",
-            "response": "Share error messages, code snippets, steps to reproduce, and what you've tried. Check docs first though!"
-        },
-        {
-            "pattern": "what is continuous integration",
-            "response": "CI automatically tests and builds code on every push to catch issues early."
-        },
-        {
-            "pattern": "how do I write clean code",
-            "response": "Use meaningful names, keep functions small, avoid duplication, and add clear comments."
-        },
-        {
-            "pattern": "what is a breakpoint",
-            "response": "A breakpoint pauses code execution so you can inspect variables and step through logic line by line."
-        },
-        {
-            "pattern": "how do I handle null pointer errors",
-            "response": "Check if values exist before using them. Use if checks or try-catch blocks to prevent crash."
-        },
-        {
-            "pattern": "what is an API",
-            "response": "An API is a set of rules for software to communicate. REST APIs use HTTP requests to fetch/send data."
-        },
-        {
-            "pattern": "how do I test an API",
-            "response": "Use tools like Postman or curl to send requests. Check status codes and response data."
-        },
-        {
-            "pattern": "what is a database query",
-            "response": "A query is a request to retrieve or modify data. SQL example: SELECT * FROM users WHERE id = 1"
-        },
-        {
-            "pattern": "how do I optimize slow code",
-            "response": "Profile to find bottlenecks, use efficient algorithms, cache results, and avoid nested loops."
-        },
-        {
-            "pattern": "what is documentation",
-            "response": "Documentation explains how code works. Includes README, inline comments, API docs, and usage examples."
-        }
-    ]
+  "knowledge": [
+    {
+      "pattern": "Hi I am Adam",
+      "response": "Hi Adam! How can I assist you today?"
+    },
+    {
+      "pattern": "hello",
+      "response": "Hello! How can I assist you today?"
+    },
+    {
+      "pattern": "Hi",
+      "response": "Hi there! How can I help you today?"
+    },
+    {
+      "pattern": "good morning",
+      "response": "Good morning! Hope your day is off to a great start."
+    },
+    {
+      "pattern": "good afternoon",
+      "response": "Good afternoon! How can I help you right now?"
+    },
+    {
+      "pattern": "good evening",
+      "response": "Good evening! What can I do for you tonight?"
+    },
+    {
+      "pattern": "how are you",
+      "response": "I'm doing well and ready to help. What do you need?"
+    },
+    {
+      "pattern": "what is your name",
+      "response": "I am Memory AI, your assistant."
+    },
+    {
+      "pattern": "who made you",
+      "response": "I was built as a Memory AI assistant and can learn from your inputs."
+    },
+    {
+      "pattern": "thank you",
+      "response": "You're welcome!"
+    },
+    {
+      "pattern": "thanks",
+      "response": "Happy to help!"
+    },
+    {
+      "pattern": "bye",
+      "response": "Goodbye! Have a great day."
+    },
+    {
+      "pattern": "help",
+      "response": "You can chat with me, ask simple math questions, or teach me new responses."
+    },
+    {
+      "pattern": "what can you do",
+      "response": "I can answer from memory, solve simple math, and learn new responses from you."
+    },
+    {
+      "pattern": "what time is it",
+      "response": "I don't track live time yet, but your device clock has the current time."
+    },
+    {
+      "pattern": "what day is it",
+      "response": "I don't track live dates yet, but your device calendar has today's date."
+    },
+    {
+      "pattern": "who are you",
+      "response": "I am Memory AI, a chatbot that can learn from your feedback."
+    },
+    {
+      "pattern": "nice to meet you",
+      "response": "Nice to meet you too!"
+    },
+    {
+      "pattern": "tell me a joke",
+      "response": "Why do programmers prefer dark mode? Because light attracts bugs."
+    },
+    {
+      "pattern": "how do I create a git branch",
+      "response": "Use: git checkout -b branch-name"
+    },
+    {
+      "pattern": "how do I push my changes",
+      "response": "Use: git add . && git commit -m 'message' && git push"
+    },
+    {
+      "pattern": "how do I pull latest changes",
+      "response": "Use: git pull origin main"
+    },
+    {
+      "pattern": "what is a pull request",
+      "response": "A pull request (PR) is a request to merge your branch into main. It allows code review before merging."
+    },
+    {
+      "pattern": "how do I revert a commit",
+      "response": "Use: git revert commit-hash (creates new commit) or git reset --hard commit-hash (removes commits)"
+    },
+    {
+      "pattern": "how do I see my git log",
+      "response": "Use: git log --oneline to see recent commits"
+    },
+    {
+      "pattern": "how do I fix a merge conflict",
+      "response": "Open the conflicted file, remove conflict markers, keep desired code, then git add and commit."
+    },
+    {
+      "pattern": "what is unit testing",
+      "response": "Unit testing verifies individual functions work correctly in isolation before integration."
+    },
+    {
+      "pattern": "how do I run tests",
+      "response": "Check your project's README. Typically: pytest (Python), npm test (Node), or mvn test (Java)."
+    },
+    {
+      "pattern": "what is code review",
+      "response": "Code review is when teammates examine your code for quality, bugs, and best practices before merging."
+    },
+    {
+      "pattern": "how do I debug my code",
+      "response": "Add print statements, use a debugger (pdb for Python), or check logs for error messages."
+    },
+    {
+      "pattern": "what does this error mean",
+      "response": "Copy the full error message and search it online, or ask a mentor. Most errors have clear solutions."
+    },
+    {
+      "pattern": "how do I set up my environment",
+      "response": "Check the project README for setup steps. Usually involves cloning repo, installing dependencies, and running locally."
+    },
+    {
+      "pattern": "how do I install dependencies",
+      "response": "For Python: pip install -r requirements.txt | For Node: npm install | Check project docs for exact command."
+    },
+    {
+      "pattern": "what is a linter",
+      "response": "A linter checks code style and catches errors automatically. Examples: ESLint (JS), Pylint (Python), Checkstyle (Java)."
+    },
+    {
+      "pattern": "what is version control",
+      "response": "Version control (Git) tracks code changes, enables collaboration, and allows reverting to previous versions."
+    },
+    {
+      "pattern": "how do I document my code",
+      "response": "Write clear docstrings/comments explaining what functions do, their parameters, and return values."
+    },
+    {
+      "pattern": "what is a commit message",
+      "response": "A commit message describes changes. Use: git commit -m 'Fix: bug in login flow' or 'Feat: add dark mode'"
+    },
+    {
+      "pattern": "how do I ask for help",
+      "response": "Share error messages, code snippets, steps to reproduce, and what you've tried. Check docs first though!"
+    },
+    {
+      "pattern": "what is continuous integration",
+      "response": "CI automatically tests and builds code on every push to catch issues early."
+    },
+    {
+      "pattern": "how do I write clean code",
+      "response": "Use meaningful names, keep functions small, avoid duplication, and add clear comments."
+    },
+    {
+      "pattern": "what is a breakpoint",
+      "response": "A breakpoint pauses code execution so you can inspect variables and step through logic line by line."
+    },
+    {
+      "pattern": "how do I handle null pointer errors",
+      "response": "Check if values exist before using them. Use if checks or try-catch blocks to prevent crash."
+    },
+    {
+      "pattern": "what is an API",
+      "response": "An API is a set of rules for software to communicate. REST APIs use HTTP requests to fetch/send data."
+    },
+    {
+      "pattern": "how do I test an API",
+      "response": "Use tools like Postman or curl to send requests. Check status codes and response data."
+    },
+    {
+      "pattern": "what is a database query",
+      "response": "A query is a request to retrieve or modify data. SQL example: SELECT * FROM users WHERE id = 1"
+    },
+    {
+      "pattern": "how do I optimize slow code",
+      "response": "Profile to find bottlenecks, use efficient algorithms, cache results, and avoid nested loops."
+    },
+    {
+      "pattern": "what is documentation",
+      "response": "Documentation explains how code works. Includes README, inline comments, API docs, and usage examples."
+    }
+  ]
 }
