@@ -1,12 +1,47 @@
 import json
 import os
 import re
+import sys
+import time
+import threading
 from difflib import SequenceMatcher
 from langchain_ollama import OllamaLLM
 
 FILE_NAME = "knowledge.json"
 
 model = OllamaLLM(model="llama3:latest")
+
+
+class LoadingAnimation:
+    """Display a loading animation while AI is thinking"""
+    def __init__(self):
+        self.is_loading = False
+        self.thread = None
+    
+    def _animate(self):
+        """Show animated dots"""
+        dots = ["   ", ".  ", ".. ", "..."]
+        idx = 0
+        while self.is_loading:
+            sys.stdout.write(f"\rAI is thinking{dots[idx % len(dots)]}")
+            sys.stdout.flush()
+            idx += 1
+            time.sleep(0.3)
+        sys.stdout.write("\r" + " " * 30 + "\r")  # Clear the line
+        sys.stdout.flush()
+    
+    def start(self):
+        """Start the loading animation"""
+        self.is_loading = True
+        self.thread = threading.Thread(target=self._animate)
+        self.thread.daemon = True
+        self.thread.start()
+    
+    def stop(self):
+        """Stop the loading animation"""
+        self.is_loading = False
+        if self.thread:
+            self.thread.join()
 
 
 def normalize_text(text):
@@ -182,7 +217,14 @@ def main():
         if user_input.lower() == "exit":
             break
 
-        answer = respond(user_input)
+        # Show loading animation while thinking
+        loader = LoadingAnimation()
+        loader.start()
+        
+        try:
+            answer = respond(user_input)
+        finally:
+            loader.stop()
 
         if answer:
             print("AI:", answer)
