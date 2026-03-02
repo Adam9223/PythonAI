@@ -10,7 +10,44 @@ model = OllamaLLM(model="llama3:latest")
 
 
 def normalize_text(text):
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", "", text.lower())). strip()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", "", text.lower())).strip()
+
+
+def tokenize(text):
+    """Split text into tokens and remove common stop words"""
+    stop_words = {'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 
+                  'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 
+                  'would', 'should', 'can', 'could', 'may', 'might', 'must',
+                  'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your',
+                  'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'from'}
+    
+    normalized = normalize_text(text)
+    tokens = [word for word in normalized.split() if word not in stop_words]
+    return tokens
+
+
+def token_similarity(text1, text2):
+    """Calculate similarity based on token overlap"""
+    tokens1 = set(tokenize(text1))
+    tokens2 = set(tokenize(text2))
+    
+    if not tokens1 or not tokens2:
+        return 0.0
+    
+    intersection = tokens1.intersection(tokens2)
+    union = tokens1.union(tokens2)
+    
+    return len(intersection) / len(union) if union else 0.0
+
+
+def combined_similarity(text1, text2):
+    """Combine string similarity and token similarity"""
+    string_sim = SequenceMatcher(None, normalize_text(text1), normalize_text(text2)).ratio()
+    token_sim = token_similarity(text1, text2)
+    
+    # Weight: 60% token similarity, 40% string similarity
+    return 0.6 * token_sim + 0.4 * string_sim
+
 
 def load_knowledge():
     if not os.path.exists(FILE_NAME):
@@ -52,27 +89,30 @@ def check_knowledge(user_input):
     if not normalized_input:
         return None, []
 
+    # Check for exact match first
     for item in data["knowledge"]:
         if normalize_text(item["pattern"]) == normalized_input:
             return item["response"], []
 
+    # Calculate similarity using tokenization and string matching
     best_matches = []
-    scores = []
 
     for item in data["knowledge"]:
-        pattern = normalize_text(item["pattern"])
-        score = similar(normalized_input, pattern)
+        # Use combined similarity (token + string)
+        score = combined_similarity(user_input, item["pattern"])
         best_matches.append((item, score))
-        scores.append(score)
 
     # Sort by score and get top 3 matches
     best_matches.sort(key=lambda x: x[1], reverse=True)
     top_matches = best_matches[:3]
 
-    if top_matches[0][1] > 0.88:
+    # If top match is very strong, return it directly
+    if top_matches[0][1] > 0.75:  # Lowered threshold due to tokenization improving accuracy
         return top_matches[0][0]["response"], []
 
-    # Return partial matches as context for LLM
+    # Return partial matches as context for LLM (threshold 0.3 for token-based)
+    context_matches = [item for item, score in top_matches if score > 0.3]
+    return None, context_matches
     context_matches = [item for item, score in top_matches if score > 0.5]
     return None, context_matches
 
