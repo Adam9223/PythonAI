@@ -1,8 +1,80 @@
 {
-    "knowledge": [
-        {
-            "pattern": "Hi I am Adam",
-            "response": "Hi Adam! How can I assist you today?"
-        }
-    ]
+  "knowledge": [
+    {
+      "pattern": "Hi I am Adam",
+      "response": "Hi Adam! How can I assist you today?"
+    },
+    {
+      "pattern": "hello",
+      "response": "Hello! How can I assist you today?"
+    },
+    {
+      "pattern": "Hi",
+      "response": "Hi there! How can I help you today?"
+    },
+    {
+      "pattern": "good morning",
+      "response": "Good morning! Hope your day is off to a great start."
+    },
+    {
+      "pattern": "good afternoon",
+      "response": "Good afternoon! How can I help you right now?"
+    },
+    {
+      "pattern": "good evening",
+      "response": "Good evening! What can I do for you tonight?"
+    },
+    {
+      "pattern": "how are you",
+      "response": "I'm doing well and ready to help. What do you need?"
+    },
+    {
+      "pattern": "what is your name",
+      "response": "I am Memory AI, your assistant."
+    },
+    {
+      "pattern": "who made you",
+      "response": "I was built as a Memory AI assistant and can learn from your inputs."
+    },
+    {
+      "pattern": "thank you",
+      "response": "You're welcome!"
+    },
+    {
+      "pattern": "thanks",
+      "response": "Happy to help!"
+    },
+    {
+      "pattern": "bye",
+      "response": "Goodbye! Have a great day."
+    },
+    {
+      "pattern": "help",
+      "response": "You can chat with me, ask simple math questions, or teach me new responses."
+    },
+    {
+      "pattern": "what can you do",
+      "response": "I can answer from memory, solve simple math, and learn new responses from you."
+    },
+    {
+      "pattern": "what time is it",
+      "response": "I don't track live time yet, but your device clock has the current time."
+    },
+    {
+      "pattern": "what day is it",
+      "response": "I don't track live dates yet, but your device calendar has today's date."
+    },
+    {
+      "pattern": "who are you",
+      "response": "I am Memory AI, a chatbot that can learn from your feedback."
+    },
+    {
+      "pattern": "nice to meet you",
+      "response": "Nice to meet you too!"
+    },
+    {
+      "pattern": "tell me a joke",
+      "response": "Why do programmers prefer dark mode? Because light attracts bugs."
+    }
+  ]
 }

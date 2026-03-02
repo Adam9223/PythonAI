@@ -9,6 +9,10 @@ FILE_NAME = "knowledge.json"
 # Load Ollama model
 model = OllamaLLM(model="llama3:latest")
 
+
+def normalize_text(text):
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", "", text.lower())).strip()
+
 def load_knowledge():
     if not os.path.exists(FILE_NAME):
         with open(FILE_NAME, "w") as f:
@@ -44,18 +48,27 @@ def similar(a, b):
 
 def check_knowledge(user_input):
     data = load_knowledge()
+    normalized_input = normalize_text(user_input)
+
+    if not normalized_input:
+        return None
+
+    for item in data["knowledge"]:
+        if normalize_text(item["pattern"]) == normalized_input:
+            return item["response"]
 
     best_match = None
     highest_score = 0
 
     for item in data["knowledge"]:
-        score = similar(user_input.lower(), item["pattern"].lower())
+        pattern = normalize_text(item["pattern"])
+        score = similar(normalized_input, pattern)
 
         if score > highest_score:
             highest_score = score
             best_match = item
 
-    if highest_score > 0.75:  # similarity threshold
+    if highest_score > 0.88:
         return best_match["response"]
 
     return None
