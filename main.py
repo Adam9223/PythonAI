@@ -230,9 +230,13 @@ def main():
             print("AI:", answer)
         else:
             print("AI: I don't know the answer.")
-            new_answer = input("What should I answer? ")
-
-            add_knowledge(user_input, new_answer)
+            add_choice = input("Add knowledge? (y/n): ").strip().lower()
+            
+            if add_choice == 'y':
+                new_answer = input("What should I answer? ")
+                add_knowledge(user_input, new_answer)
+            else:
+                print("Skipped learning this response.")
 
 
 if __name__ == "__main__":
