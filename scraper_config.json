@@ -1,0 +1,17 @@
+{
+  "company_website": {
+    "url": "https://staging.ulap.biz/",
+    "selector": "div.content, p, table",
+    "inventory_paths": [
+      "/sc",
+      "/stock-card",
+      "/stockcard",
+      "/inventory",
+      "/products"
+    ]
+  },
+  "example_site": {
+    "url": "https://example.com",
+    "selector": "p"
+  }
+}
