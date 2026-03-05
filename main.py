@@ -150,11 +150,12 @@ def search_articles(query, max_results=3):
         # Combined score: 70% title, 30% content
         score = 0.7 * title_sim + 0.3 * token_score
         
-        if score > 0.1:  # Minimum threshold
+        if score > 0.35:  # Higher threshold to avoid weak matches
             scored_articles.append((article, score))
     
     # Sort by score and return top results
     scored_articles.sort(key=lambda x: x[1], reverse=True)
+    # Only return articles with strong relevance
     return [article for article, score in scored_articles[:max_results]]
 
 
@@ -223,8 +224,8 @@ def check_knowledge(user_input):
     if top_matches and top_matches[0][1] > 0.75:  # Lowered threshold due to tokenization improving accuracy
         return top_matches[0][0]["response"], []
 
-    # Return partial matches as context for LLM (threshold 0.3 for token-based)
-    context_matches = [item for item, score in top_matches if score > 0.3]
+    # Only return context matches if they're reasonably similar (high threshold to avoid weak matches)
+    context_matches = [item for item, score in top_matches if score > 0.6]
     return None, context_matches
 
 def try_math(user_input):
@@ -728,26 +729,26 @@ def respond(user_input, site_context=None):
     relevant_articles = search_articles(user_input, max_results=3)
     
     if relevant_articles:
+        # Verify we have strong matches before using them
         query_tokens = set(tokenize(user_input))
         
         # Extract relevant text from top articles
         context_parts = []
         for article in relevant_articles[:2]:  # Use top 2 articles
             relevant_text = extract_relevant_text(article['content'], query_tokens, max_length=400)
-            context_parts.append(relevant_text)
+            if relevant_text and len(relevant_text) > 50:  # Only use non-empty, substantial responses
+                context_parts.append(relevant_text)
         
-        # Format into a natural, conversational response
-        natural_response = format_natural_response(context_parts, user_input)
-        return natural_response
+        if context_parts:
+            # Format into a natural, conversational response
+            natural_response = format_natural_response(context_parts, user_input)
+            return natural_response
     
     # If we have context matches from knowledge base, use them
     if context_matches:
-        context_response = "Based on related knowledge:\n"
-        for i, match in enumerate(context_matches[:2], 1):
-            context_response += f"\n{i}. {match['response'][:200]}"
-            if len(match['response']) > 200:
-                context_response += "..."
-        return context_response
+        # Return best matching response from knowledge base
+        best_match = max(context_matches, key=lambda x: combined_similarity(user_input, x['pattern']))
+        return best_match['response']
     
     # No relevant context found
     return None

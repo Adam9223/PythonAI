@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Chatbot - Test Interface</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="chat-wrapper">
+        <!-- Header -->
+        <div class="header">
+          <h1>🤖 AI Chatbot</h1>
+          <p class="subtitle">Powered by Ollama + Python</p>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chatMessages">
+          <div class="message ai-message">
+            <span class="avatar">🤖</span>
+            <div class="message-content">
+              Hello! I'm an AI assistant. Ask me anything or teach me new
+              responses!
+            </div>
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+          <form id="chatForm" onsubmit="sendMessage(event)">
+            <input
+              type="text"
+              id="userInput"
+              placeholder="Type your message here..."
+              autocomplete="off"
+            />
+            <button type="submit" id="sendBtn">Send</button>
+          </form>
+        </div>
+
+        <!-- Status -->
+        <div class="status" id="status">Ready</div>
+      </div>
+    </div>
+
+    <script src="chat.js"></script>
+  </body>
+</html>
