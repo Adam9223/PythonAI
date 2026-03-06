@@ -13,20 +13,19 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  padding: 0;
+  margin: 0;
 }
 
 .container {
-  width: 100%;
-  max-width: 600px;
-  height: 90vh;
-  max-height: 800px;
+  width: 100vw;
+  height: 100vh;
 }
 
 .chat-wrapper {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -35,7 +34,7 @@ body {
 
 /* Header */
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%);
   color: white;
   padding: 20px;
   text-align: center;
@@ -218,6 +217,21 @@ body {
   background: #999;
 }
 
+/* Chart styling */
+.message-content canvas {
+  max-width: 100%;
+  max-height: 900px;
+  margin-top: 8px;
+}
+
+.ai-message .message-content:has(canvas) {
+  max-width: 99%;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 /* Mobile responsiveness */
 @media (max-width: 600px) {
   .container {
@@ -228,4 +242,126 @@ body {
   .message-content {
     max-width: 85% !important;
   }
+
+  .ai-message .message-content:has(canvas) {
+    max-width: 95%;
+  }
+}
+
+/* Chart Modal */
+.chart-modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  animation: fadeIn 0.2s ease-in;
+}
+
+.chart-modal.show {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background-color: #ffffff;
+  padding: 30px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+.modal-close {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  font-size: 32px;
+  font-weight: bold;
+  color: #999;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+  z-index: 1;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.modal-chart-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+#modalChartCanvas {
+  max-width: 100%;
+  max-height: calc(90vh - 120px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Chart fullscreen button */
+.chart-fullscreen-btn {
+  position: relative;
+  top: 0;
+  right: 0;
+  background: rgba(255, 140, 0, 0.1);
+  border: 1px solid #ff8c00;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: none;
+  z-index: 10;
+}
+
+.chart-fullscreen-btn:hover {
+  background: #ff8c00;
+  border-color: #ff8c00;
+  box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
+}
+
+.chart-fullscreen-btn:hover .material-icons {
+  color: white;
+}
+
+.chart-fullscreen-btn .material-icons {
+  font-size: 18px;
+  color: #ff8c00;
+  transition: color 0.2s;
+}
+
+.chart-fullscreen-btn:active {
+  transform: scale(0.95);
 }

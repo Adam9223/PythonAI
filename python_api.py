@@ -14,7 +14,7 @@ old_stdout = sys.stdout
 sys.stdout = StringIO()
 
 try:
-    from main import respond
+    from main import respond, store_conversation, extract_context_from_input, build_context_reminder
 finally:
     sys.stdout = old_stdout
 
@@ -28,6 +28,12 @@ def main():
         user_message = input("You: ")
         output_json = False
     
+    # Extract context from user input (optional - may not exist in main.py)
+    try:
+        extract_context_from_input(user_message)
+    except (NameError, AttributeError):
+        pass  # Function doesn't exist yet
+    
     # Get response from the chatbot
     response = respond(user_message)
     
@@ -35,6 +41,12 @@ def main():
         result = response
     else:
         result = "I don't know how to answer that. Feel free to teach me!"
+    
+    # Store conversation context (optional - may not exist in main.py)
+    try:
+        store_conversation(user_message, result)
+    except (NameError, AttributeError):
+        pass  # Function doesn't exist yet
     
     if output_json:
         # Output as JSON for Node.js parsing

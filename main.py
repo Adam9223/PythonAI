@@ -4,6 +4,7 @@ import re
 import sys
 import time
 import threading
+from datetime import datetime
 from difflib import SequenceMatcher
 
 # Import new modules for web scraping and graph generation
@@ -23,11 +24,158 @@ ARTICLES_DB = "articles_db.json"
 # Global cache for articles database
 articles_cache = None
 last_chart_context = None
+balance_context = None  # Track the last balance query for chart generation
 live_site_cache = None
 live_site_cache_timestamp = 0
 LIVE_SITE_CACHE_SECONDS = 90
 
+# Conversation context storage
+conversation_history = []  # List of dicts with user input and AI response
+extracted_context = {  # Store extracted facts and entities
+    'mentioned_data_sources': [],  # e.g., 'general_ledger', 'stock_card'
+    'data_values': {},  # e.g., {'balance': '336.1M'}
+    'user_preferences': {},  # e.g., {'chart_type': 'line'}
+    'facts': []  # e.g., 'User is interested in GL data'
+}
+MAX_HISTORY = 20  # Keep most recent 20 exchanges
+CONVERSATION_STORE = "conversation_store.json"
+
 print("AI Assistant - Retrieval-Augmented Generation System")
+
+
+# Persistent conversation storage
+def load_conversation_store():
+    """Load conversation history from persistent JSON file."""
+    global conversation_history, extracted_context
+    
+    try:
+        if os.path.exists(CONVERSATION_STORE):
+            with open(CONVERSATION_STORE, 'r') as f:
+                store = json.load(f)
+                conversation_history = store.get('history', [])
+                extracted_context = store.get('context', extracted_context)
+    except Exception as e:
+        print(f"Error loading conversation store: {e}")
+
+
+def save_conversation_store():
+    """Save conversation history to persistent JSON file."""
+    global conversation_history, extracted_context
+    
+    try:
+        store = {
+            'history': conversation_history[-MAX_HISTORY:],
+            'context': extracted_context
+        }
+        with open(CONVERSATION_STORE, 'w') as f:
+            json.dump(store, f, indent=2)
+    except Exception as e:
+        print(f"Error saving conversation store: {e}")
+
+
+# Context Management Functions
+def store_conversation(user_input, ai_response):
+    """
+    Store user input and AI response in conversation history.
+    """
+    global conversation_history, MAX_HISTORY
+    
+    # Load before appending to get latest
+    load_conversation_store()
+    
+    conversation_history.append({
+        'user': user_input,
+        'ai': ai_response,
+        'timestamp': time.time()
+    })
+    
+    # Keep only recent history
+    if len(conversation_history) > MAX_HISTORY:
+        conversation_history = conversation_history[-MAX_HISTORY:]
+    
+    # Save immediately
+    save_conversation_store()
+
+
+def extract_context_from_input(user_input):
+    """
+    Extract important facts and entities from user input.
+    """
+    global extracted_context
+    normalized = user_input.lower()
+    
+    # Detect data source mentions
+    if any(term in normalized for term in ['general ledger', 'gl', 'ledger']):
+        if 'general_ledger' not in extracted_context['mentioned_data_sources']:
+            extracted_context['mentioned_data_sources'].append('general_ledger')
+    
+    if any(term in normalized for term in ['stock card', 'stock', 'inventory']):
+        if 'stock_card' not in extracted_context['mentioned_data_sources']:
+            extracted_context['mentioned_data_sources'].append('stock_card')
+    
+    # Detect chart type preferences
+    if 'line' in normalized:
+        extracted_context['user_preferences']['chart_type'] = 'line'
+    elif 'bar' in normalized:
+        extracted_context['user_preferences']['chart_type'] = 'bar'
+    elif 'pie' in normalized:
+        extracted_context['user_preferences']['chart_type'] = 'pie'
+    
+    # Extract numbers (could be balances, periods, etc.)
+    numbers = re.findall(r'\d+(?:\.\d+)?', user_input)
+    if numbers:
+        extracted_context['data_values']['mentioned_numbers'] = numbers
+
+
+def get_relevant_history(query, max_results=3):
+    """
+    Search conversation history for relevant past exchanges.
+    """
+    if not conversation_history:
+        return []
+    
+    query_tokens = set(tokenize(query.lower()))
+    relevant = []
+    
+    for exchange in conversation_history:
+        user_sim = token_similarity(query.lower(), exchange['user'].lower())
+        # Handle AI response that might be a dict (chart data) or string
+        ai_response = exchange['ai']
+        if isinstance(ai_response, dict):
+            ai_response_str = str(ai_response)
+        else:
+            ai_response_str = ai_response
+        ai_sim = token_similarity(query.lower(), ai_response_str.lower())
+        max_sim = max(user_sim, ai_sim)
+        
+        if max_sim > 0.3:  # Relevance threshold
+            relevant.append({
+                'user': exchange['user'],
+                'ai': exchange['ai'],
+                'relevance': max_sim
+            })
+    
+    # Sort by relevance and return top results
+    relevant.sort(key=lambda x: x['relevance'], reverse=True)
+    return relevant[:max_results]
+
+
+def build_context_reminder():
+    """
+    Generate a reminder of relevant past context for the AI to consider.
+    """
+    reminders = []
+    
+    if extracted_context['mentioned_data_sources']:
+        reminders.append(f"User is interested in: {', '.join(extracted_context['mentioned_data_sources'])}")
+    
+    if extracted_context['user_preferences']:
+        reminders.append(f"User preferences: {json.dumps(extracted_context['user_preferences'])}")
+    
+    return " ".join(reminders) if reminders else ""
+
+
+
 print("Using tokenized Wikipedia corpus for context-aware responses\n")
 
 
@@ -228,6 +376,23 @@ def check_knowledge(user_input):
     context_matches = [item for item, score in top_matches if score > 0.6]
     return None, context_matches
 
+
+def handle_greeting_request(user_input):
+    normalized_input = normalize_text(user_input)
+    if not normalized_input:
+        return None
+
+    greeting_patterns = [
+        r"^(hi|hello|hey)\b",
+        r"^good\s+(morning|afternoon|evening)\b",
+        r"^how\s+are\s+you\b"
+    ]
+
+    if any(re.search(pattern, normalized_input) for pattern in greeting_patterns):
+        return "Hello! I can help with balances, inventory, charts, and financial questions. What would you like to check?"
+
+    return None
+
 def try_math(user_input):
     match = re.search(r'(\d+\s*[\+\-\*\/]\s*\d+)', user_input)
     if match:
@@ -391,6 +556,47 @@ def get_live_company_data(force_refresh=False):
             pass
 
     return data
+
+
+def get_live_gl_data(force_refresh=False):
+    """
+    Fetch live General Ledger data from website data.
+    Attempts to extract GL data from scraped website content.
+    Falls back to sample data if website data unavailable.
+    """
+    global live_site_cache, live_site_cache_timestamp
+    
+    try:
+        # Try to get live site data
+        live_data = get_live_company_data(force_refresh)
+        
+        # If we have GL-related fields in the live data, use them
+        if live_data and "error" not in live_data:
+            # Check for GL data in scraped content
+            if "financial" in live_data or "ledger" in live_data or "balance" in live_data:
+                return {
+                    'source': 'live_website',
+                    'data': live_data,
+                    'timestamp': datetime.now().isoformat()
+                }
+        
+    except Exception as e:
+        print(f"Error fetching live GL data: {e}")
+    
+    # Fallback to sample data
+    if os.path.exists('gl_sample_data.json'):
+        try:
+            with open('gl_sample_data.json', 'r') as f:
+                sample_data = json.load(f)
+                return {
+                    'source': 'sample_data',
+                    'data': sample_data,
+                    'timestamp': datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error loading sample GL data: {e}")
+    
+    return None
 
 
 def answer_from_live_site(user_input, site_context=None):
@@ -586,6 +792,391 @@ def handle_inventory_request(user_input, site_context=None):
     )
 
 
+def is_affirmation(user_input):
+    """
+    Detect if user input is an affirmative response (yes, sure, ok, please, etc.)
+    """
+    affirmation_patterns = [
+        r"\b(yes|yeah|yep|yup|sure|ok|okay|please|absolutely|definitely|of course|go ahead)\b",
+        r"^(that would be|that sounds|i'd like|i'd love|please)$",
+        r"\b(generate|show|create|make|display|show me)\b.*(chart|graph|visual)",
+    ]
+    normalized = user_input.lower().strip()
+    return any(re.search(pattern, normalized, re.IGNORECASE) for pattern in affirmation_patterns)
+
+
+def handle_chart_from_balance_context():
+    """
+    Generate a General Ledger balance chart from GL sample data.
+    Used when user confirms they want to see the balance evolution chart.
+    """
+    try:
+        if os.path.exists('gl_sample_data.json'):
+            with open('gl_sample_data.json', 'r') as f:
+                gl_data = json.load(f)
+            
+            if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
+                trend_data = gl_data['samples']['annual_trend']
+                rep = trend_data.get('rep', [])
+                
+                if rep and len(rep) > 0:
+                    # Extract data for line chart visualization
+                    labels = [item['YrMo'] for item in rep]
+                    balance_data = [item['runBal'] for item in rep]
+                    
+                    chart_data = {
+                        'type': 'chart',
+                        'chartType': 'line',
+                        'title': "General Ledger - Running Balance",
+                        'chartData': {
+                            'labels': labels,
+                            'datasets': [
+                                {
+                                    'label': 'Running Balance',
+                                    'data': balance_data,
+                                    'borderColor': 'rgba(255, 140, 0, 1)',
+                                    'backgroundColor': 'rgba(255, 140, 0, 0.1)',
+                                    'tension': 0.4
+                                }
+                            ]
+                        }
+                    }
+                    
+                    # Return as JSON so frontend can render it
+                    return json.dumps(chart_data)
+    except Exception as e:
+        print(f"Error generating chart from balance context: {e}")
+    
+    return None
+
+
+def detect_chart_type_preference(user_input):
+    """
+    Detect if user is requesting a specific chart type.
+    Returns the requested chart type or None if no preference.
+    """
+    normalized = user_input.lower()
+    
+    # Check for specific chart type requests
+    line_patterns = [
+        r"line\s+(chart|graph)",
+        r"(chart|graph).*line",
+        r"historical.*graph",
+        r"historical.*chart",
+        r"evolution",
+        r"over time",
+        r"not.*bar",
+        r"instead of bar",
+        r"time.*series",
+    ]
+    
+    pie_patterns = [
+        r"pie\s+(chart|graph)",
+        r"(chart|graph).*pie",
+        r"donut\s+(chart|graph)",
+    ]
+    
+    bar_patterns = [
+        r"bar\s+(chart|graph)",
+        r"(chart|graph).*bar",
+    ]
+    
+    # Check in order of specificity
+    if any(re.search(pattern, normalized) for pattern in line_patterns):
+        return 'line'
+    elif any(re.search(pattern, normalized) for pattern in pie_patterns):
+        return 'pie'
+    elif any(re.search(pattern, normalized) for pattern in bar_patterns):
+        return 'bar'
+    
+    return None
+
+
+def handle_balance_request(user_input):
+    """
+    Handle balance inquiry requests dynamically by loading data and generating responses.
+    Supports General Ledger balance queries and is extensible for future data types.
+    """
+    global conversation_history
+    normalized_input = user_input.lower()
+    
+    # Check for credit/debit chart requests
+    credit_debit_patterns = [
+        r"(credit|debit).*(chart|graph|debit|credit)",
+        r"(chart|graph).*(credit|debit)",
+        r"show.*(credit|debit)",
+        r"give me.*(credit|debit)",
+    ]
+    
+    is_credit_debit_request = any(re.search(pattern, normalized_input) for pattern in credit_debit_patterns)
+    
+    # Also check if user is asking for a different format of the last chart WITHOUT explicitly naming it
+    # This handles cases like "show me as a line chart" or "give me a historical graph of it"
+    is_chart_type_change_request = (
+        detect_chart_type_preference(user_input) is not None and
+        any(word in normalized_input for word in ['it', 'that', 'this chart', 'this graph', 'that chart', 'that graph', 'the chart', 'the graph'])
+    )
+    
+    # If user is asking for a chart type change of a previous credit/debit chart, regenerate with new type
+    if is_chart_type_change_request and conversation_history and len(conversation_history) > 0:
+        last_response = conversation_history[-1]['ai']
+        is_last_credit_debit = False
+        
+        # Check if the last response was a credit/debit chart
+        if isinstance(last_response, dict) and last_response.get('title') == "General Ledger - Debits vs Credits":
+            is_last_credit_debit = True
+        elif isinstance(last_response, str) and "Debits vs Credits" in last_response:
+            is_last_credit_debit = True
+        
+        if is_last_credit_debit:
+            is_credit_debit_request = True  # Treat as credit/debit request with type change
+    
+    if is_credit_debit_request:
+        if os.path.exists('gl_sample_data.json'):
+            try:
+                with open('gl_sample_data.json', 'r') as f:
+                    gl_data = json.load(f)
+                
+                if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
+                    trend_data = gl_data['samples']['annual_trend']
+                    rep = trend_data.get('rep', [])
+                    
+                    if rep and len(rep) > 0:
+                        # Detect if user wants a different chart type
+                        preferred_chart_type = detect_chart_type_preference(user_input)
+                        chart_type = preferred_chart_type or 'bar'  # Default to bar for credit/debit
+                        
+                        # Extract data for visualization
+                        labels = [item['YrMo'] for item in rep]
+                        debit_data = [item['tDr'] for item in rep]
+                        credit_data = [abs(item['tCr']) for item in rep]
+                        
+                        # Build chart based on preferred type
+                        if chart_type == 'line':
+                            datasets = [
+                                {
+                                    'label': 'Debits',
+                                    'data': debit_data,
+                                    'borderColor': 'rgba(102, 126, 234, 1)',
+                                    'backgroundColor': 'rgba(102, 126, 234, 0.1)',
+                                    'tension': 0.4
+                                },
+                                {
+                                    'label': 'Credits',
+                                    'data': credit_data,
+                                    'borderColor': 'rgba(237, 100, 166, 1)',
+                                    'backgroundColor': 'rgba(237, 100, 166, 0.1)',
+                                    'tension': 0.4
+                                }
+                            ]
+                        elif chart_type == 'pie':
+                            # For pie, sum the totals
+                            total_debits = sum(debit_data)
+                            total_credits = sum(credit_data)
+                            datasets = [
+                                {
+                                    'label': 'Total Debits vs Credits',
+                                    'data': [total_debits, total_credits],
+                                    'backgroundColor': [
+                                        'rgba(102, 126, 234, 0.8)',
+                                        'rgba(237, 100, 166, 0.8)'
+                                    ]
+                                }
+                            ]
+                            labels = ['Debits', 'Credits']
+                        else:  # bar (default)
+                            datasets = [
+                                {
+                                    'label': 'Debits',
+                                    'data': debit_data,
+                                    'backgroundColor': 'rgba(102, 126, 234, 0.8)'
+                                },
+                                {
+                                    'label': 'Credits',
+                                    'data': credit_data,
+                                    'backgroundColor': 'rgba(237, 100, 166, 0.8)'
+                                }
+                            ]
+                        
+                        chart_data = {
+                            'type': 'chart',
+                            'chartType': chart_type,
+                            'title': "General Ledger - Debits vs Credits",
+                            'chartData': {
+                                'labels': labels,
+                                'datasets': datasets
+                            }
+                        }
+                        
+                        # Return as JSON so frontend can render it
+                        return json.dumps(chart_data)
+            except Exception as e:
+                print(f"Error generating credit/debit chart: {e}")
+                return None
+    
+    # Check for direct balance chart/graph requests
+    balance_chart_patterns = [
+        r"(graph|chart).*(balance.*evolved|balance.*over time|balance.*time)",
+        r"(balance.*evolved|balance.*over time|balance.*time).*(graph|chart)",
+        r"show\s+(me\s+)*(balance|gl|ledger).*(chart|graph)",
+        r"give\s+me.*(balance|gl|ledger).*(chart|graph|visual)",
+        r"show.*(chart|graph).*(balance|gl|ledger).*(evolved|over time)",
+        r"how.*balance.*evolved",
+        r"balance.*over time",
+    ]
+    
+    is_balance_chart_request = any(re.search(pattern, normalized_input) for pattern in balance_chart_patterns)
+    
+    # If user is requesting the chart directly, generate it
+    if is_balance_chart_request:
+        if os.path.exists('gl_sample_data.json'):
+            try:
+                with open('gl_sample_data.json', 'r') as f:
+                    gl_data = json.load(f)
+                
+                if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
+                    trend_data = gl_data['samples']['annual_trend']
+                    rep = trend_data.get('rep', [])
+                    
+                    if rep and len(rep) > 0:
+                        # Detect if user wants a specific chart type
+                        preferred_chart_type = detect_chart_type_preference(user_input)
+                        chart_type = preferred_chart_type or 'line'  # Default to line for balance
+                        
+                        # Extract data for visualization
+                        labels = [item['YrMo'] for item in rep]
+                        balance_data = [item['runBal'] for item in rep]
+                        
+                        # Build chart based on preferred type
+                        if chart_type == 'bar':
+                            datasets = [
+                                {
+                                    'label': 'Running Balance',
+                                    'data': balance_data,
+                                    'backgroundColor': 'rgba(255, 140, 0, 0.8)'
+                                }
+                            ]
+                        elif chart_type == 'pie':
+                            # For pie, show final balance as proportion
+                            final_balance = balance_data[-1]
+                            datasets = [
+                                {
+                                    'label': 'Final Balance',
+                                    'data': [final_balance],
+                                    'backgroundColor': ['rgba(255, 140, 0, 0.8)']
+                                }
+                            ]
+                            labels = ['Running Balance']
+                        else:  # line (default)
+                            datasets = [
+                                {
+                                    'label': 'Running Balance',
+                                    'data': balance_data,
+                                    'borderColor': 'rgba(255, 140, 0, 1)',
+                                    'backgroundColor': 'rgba(255, 140, 0, 0.1)',
+                                    'tension': 0.4
+                                }
+                            ]
+                        
+                        chart_data = {
+                            'type': 'chart',
+                            'chartType': chart_type,
+                            'title': "General Ledger - Running Balance",
+                            'chartData': {
+                                'labels': labels,
+                                'datasets': datasets
+                            }
+                        }
+                        
+                        # Return as JSON so frontend can render it
+                        return json.dumps(chart_data)
+            except Exception as e:
+                print(f"Error generating balance chart: {e}")
+                return None
+    
+    # Check if this is a balance-related query
+    balance_patterns = [
+        r"\b(balance|running balance)\b.*\b(general ledger|gl|ledger)\b",
+        r"\b(general ledger|gl|ledger)\b.*\b(balance|running balance)\b",
+        r"what is the balance",
+        r"tell me the balance",
+        r"can you.*balance",
+        r"what.*balance",
+    ]
+    
+    is_balance_query = any(re.search(pattern, normalized_input) for pattern in balance_patterns)
+    if not is_balance_query:
+        return None
+    
+    # Check for specific data source mentions
+    is_gl_query = any(term in normalized_input for term in ['general ledger', 'gl', 'ledger'])
+    is_stock_query = any(term in normalized_input for term in ['stock card', 'stock', 'inventory'])
+    
+    # Handle General Ledger balance queries
+    if is_gl_query or (not is_stock_query and is_balance_query):
+        if os.path.exists('gl_sample_data.json'):
+            try:
+                with open('gl_sample_data.json', 'r') as f:
+                    gl_data = json.load(f)
+                
+                if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
+                    trend_data = gl_data['samples']['annual_trend']
+                    rep = trend_data.get('rep', [])
+                    
+                    if rep:
+                        # Get the latest balance
+                        latest_balance = rep[-1]['runBal']
+                        first_date = rep[0]['YrMo']
+                        last_date = rep[-1]['YrMo']
+                        num_periods = len(rep)
+                        
+                        # Format balance for readability
+                        if latest_balance >= 1_000_000:
+                            balance_str = f"{latest_balance / 1_000_000:.1f} million"
+                        else:
+                            balance_str = f"{latest_balance:,.2f}"
+                        
+                        # Generate dynamic response
+                        response = (
+                            f"The current General Ledger running balance is {balance_str}. "
+                            f"This is based on our sample data spanning {first_date} to {last_date} "
+                            f"across {num_periods} transaction periods. "
+                            f"Would you like me to generate a chart showing how this balance has evolved over time?"
+                        )
+                        
+                        # Set context for subsequent chart generation
+                        global balance_context
+                        balance_context = {
+                            'data_source': 'general_ledger',
+                            'balance': latest_balance,
+                            'date_range': f"{first_date} to {last_date}",
+                            'periods': num_periods
+                        }
+                        
+                        return response
+            except Exception as e:
+                print(f"Error loading GL balance data: {e}")
+                return None
+    
+    # Handle stock card balance queries
+    if is_stock_query:
+        return (
+            "Stock card balance queries are not yet available. "
+            "I'm currently configured to work with General Ledger data. "
+            "Stock card data integration is planned for future updates."
+        )
+    
+    # Generic balance query without specific data source
+    if is_balance_query and not is_gl_query and not is_stock_query:
+        return (
+            "I can help you with balance information! Please specify which data source you'd like "
+            "(e.g., General Ledger, Stock Card, or another data type). "
+            "Currently, I have General Ledger sample data available."
+        )
+    
+    return None
+
+
 def handle_graph_request(user_input):
     """Handle graph generation requests"""
     global last_chart_context
@@ -626,15 +1217,92 @@ def handle_graph_request(user_input):
         return None
     
     # Determine chart type
-    chart_type = 'bar'  # default
-    if 'line' in user_input.lower():
-        chart_type = 'line'
+    chart_type = 'line'  # default to line chart for GL data
+    if 'bar' in user_input.lower():
+        chart_type = 'bar'
     elif 'pie' in user_input.lower():
         chart_type = 'pie'
     elif 'scatter' in user_input.lower():
         chart_type = 'scatter'
     elif 'histogram' in user_input.lower():
         chart_type = 'histogram'
+    
+    # Check for general ledger data first (highest priority)
+    if os.path.exists('gl_sample_data.json'):
+        try:
+            with open('gl_sample_data.json', 'r') as f:
+                gl_data = json.load(f)
+            
+            # Use the annual_trend data which has monthly/weekly breakdown
+            if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
+                trend_data = gl_data['samples']['annual_trend']
+                rep = trend_data.get('rep', [])
+                
+                if rep and len(rep) > 0:
+                    # Extract data for visualization
+                    labels = [item['YrMo'] for item in rep]
+                    debit_data = [item['tDr'] for item in rep]
+                    credit_data = [abs(item['tCr']) for item in rep]
+                    balance_data = [item['runBal'] for item in rep]
+                    
+                    if chart_type == 'line':
+                        datasets = [
+                            {
+                                'label': 'Running Balance',
+                                'data': balance_data,
+                                'borderColor': 'rgba(102, 126, 234, 1)',
+                                'backgroundColor': 'rgba(102, 126, 234, 0.1)',
+                                'tension': 0.4,
+                                'yAxisID': 'y'
+                            }
+                        ]
+                        title = "General Ledger - Running Balance"
+                    elif chart_type == 'bar':
+                        datasets = [
+                            {
+                                'label': 'Debits',
+                                'data': debit_data,
+                                'backgroundColor': 'rgba(102, 126, 234, 0.8)'
+                            },
+                            {
+                                'label': 'Credits',
+                                'data': credit_data,
+                                'backgroundColor': 'rgba(237, 100, 166, 0.8)'
+                            }
+                        ]
+                        title = "General Ledger - Debits vs Credits"
+                    else:
+                        # Default to line chart for GL data
+                        chart_type = 'line'
+                        datasets = [
+                            {
+                                'label': 'Running Balance',
+                                'data': balance_data,
+                                'borderColor': 'rgba(102, 126, 234, 1)',
+                                'backgroundColor': 'rgba(102, 126, 234, 0.1)',
+                                'tension': 0.4
+                            }
+                        ]
+                        title = "General Ledger - Running Balance"
+                    
+                    last_chart_context = {
+                        'title': title,
+                        'source': 'General Ledger sample data (gl_sample_data.json)',
+                        'data_points': len(labels)
+                    }
+                    
+                    return {
+                        'type': 'chart',
+                        'chartType': chart_type,
+                        'title': title,
+                        'chartData': {
+                            'labels': labels,
+                            'datasets': datasets
+                        }
+                    }
+        except Exception as e:
+            print(f"Error loading GL data: {e}")
+            pass
     
     # Check if we have scraped data to visualize
     if os.path.exists('scraped_data_temp.json'):
@@ -643,43 +1311,73 @@ def handle_graph_request(user_input):
                 scraped_data = json.load(f)
             
             # Try to extract numerical data from scraped content
-            if chart_type == 'bar':
-                data = {f"Item {i+1}": len(item.split()) for i, item in enumerate(scraped_data['content'][:5])}
+            if scraped_data.get('content') and len(scraped_data['content']) > 0:
+                word_counts = [len(item.split()) for item in scraped_data['content'][:5]]
+                labels = [f"Item {i+1}" for i in range(len(word_counts))]
+                
                 last_chart_context = {
                     'title': 'Word Count Analysis',
                     'source': 'recently scraped website content (word counts of top items)',
-                    'data_points': len(data)
+                    'data_points': len(word_counts)
                 }
                 return {
                     'type': 'chart',
                     'chartType': chart_type,
                     'title': 'Word Count Analysis',
-                    'data': data
+                    'chartData': {
+                        'labels': labels,
+                        'datasets': [{
+                            'label': 'Word Count',
+                            'data': word_counts,
+                            'backgroundColor': ['rgba(102, 126, 234, 0.8)', 'rgba(118, 75, 162, 0.8)', 'rgba(237, 100, 166, 0.8)', 'rgba(255, 154, 158, 0.8)', 'rgba(255, 127, 80, 0.8)']
+                        }]
+                    }
                 }
         except Exception as e:
             pass
     
     # Generate example chart data
     if chart_type == 'bar':
-        data = {"Q1": 100, "Q2": 150, "Q3": 130, "Q4": 180}
+        labels = ["Q1", "Q2", "Q3", "Q4"]
+        datasets = [{
+            'label': 'Quarterly Performance',
+            'data': [100, 150, 130, 180],
+            'backgroundColor': ['rgba(102, 126, 234, 0.8)', 'rgba(118, 75, 162, 0.8)', 'rgba(237, 100, 166, 0.8)', 'rgba(255, 154, 158, 0.8)']
+        }]
         title = "Quarterly Performance"
+        data_points = len(labels)
     elif chart_type == 'line':
-        data = {"Series A": [10, 15, 13, 17, 20, 22], "Series B": [12, 11, 14, 16, 19, 21]}
+        labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+        datasets = [
+            {
+                'label': 'Series A',
+                'data': [10, 15, 13, 17, 20, 22],
+                'borderColor': 'rgba(102, 126, 234, 1)',
+                'backgroundColor': 'rgba(102, 126, 234, 0.1)',
+                'tension': 0.4
+            },
+            {
+                'label': 'Series B',
+                'data': [12, 11, 14, 16, 19, 21],
+                'borderColor': 'rgba(118, 75, 162, 1)',
+                'backgroundColor': 'rgba(118, 75, 162, 0.1)',
+                'tension': 0.4
+            }
+        ]
         title = "Trend Analysis"
+        data_points = len(labels) * len(datasets)
     elif chart_type == 'pie':
-        data = {"Category A": 30, "Category B": 25, "Category C": 20, "Category D": 25}
+        labels = ["Category A", "Category B", "Category C", "Category D"]
+        datasets = [{
+            'label': 'Distribution',
+            'data': [30, 25, 20, 25],
+            'backgroundColor': ['rgba(102, 126, 234, 0.8)', 'rgba(118, 75, 162, 0.8)', 'rgba(237, 100, 166, 0.8)', 'rgba(255, 154, 158, 0.8)']
+        }]
         title = "Distribution"
+        data_points = len(labels)
     else:
         return "Please provide data for the graph or scrape a website first."
     
-    # Return structured data for frontend
-    data_points = 0
-    if isinstance(data, dict):
-        if data and all(isinstance(v, list) for v in data.values()):
-            data_points = sum(len(v) for v in data.values())
-        else:
-            data_points = len(data)
-
     last_chart_context = {
         'title': title,
         'source': 'built-in sample dataset',
@@ -690,11 +1388,67 @@ def handle_graph_request(user_input):
         'type': 'chart',
         'chartType': chart_type,
         'title': title,
-        'data': data
+        'chartData': {
+            'labels': labels,
+            'datasets': datasets
+        }
     }
 
 
 def respond(user_input, site_context=None):
+    global balance_context, conversation_history, extracted_context
+    
+    # Load conversation history from persistent store
+    load_conversation_store()
+    
+    # Extract context from current input
+    extract_context_from_input(user_input)
+    
+    # Check conversation history for relevant context
+    relevant_history = get_relevant_history(user_input, max_results=3)
+    
+    # Check if user is confirming a chart generation offer
+    # by looking at conversation history
+    if is_affirmation(user_input) and conversation_history:
+        # Check if the last AI response asked about generating a chart
+        last_ai_response_raw = conversation_history[-1]['ai'] if conversation_history else ""
+        # Handle AI response that might be a dict (chart data) or string
+        if isinstance(last_ai_response_raw, dict):
+            last_ai_response = str(last_ai_response_raw).lower()
+        else:
+            last_ai_response = last_ai_response_raw.lower()
+        
+        if any(phrase in last_ai_response for phrase in [
+            "would you like me to generate a chart",
+            "would you like to see a chart",
+            "want me to show you a chart",
+            "want to see this visualized",
+            "balance.*evolved"
+        ]):
+            # User is confirming the chart offer from previous response
+            chart_response = handle_chart_from_balance_context()
+            if chart_response:
+                return chart_response
+    
+    # Check if user is referring to something from past conversation
+    # (words like "that", "it", "the", "this" without clear subject)
+    reference_words = ['that', 'it', 'the one', 'that one', 'this', 'what you mentioned']
+    is_referencing = any(word in user_input.lower() for word in reference_words)
+    
+    if is_referencing and relevant_history:
+        # User is likely referring to something we discussed before
+        past_context = relevant_history[0]
+        # Continue using the same context from previous interaction
+        balance_context = balance_context or {
+            'referenced_exchange': past_context['user'],
+            'previous_response': past_context['ai']
+        }
+
+    # Handle greetings/chitchat with a deterministic response
+    greeting_response = handle_greeting_request(user_input)
+    if greeting_response:
+        return greeting_response
+    
     # Check for inventory/stock card requests
     inventory_response = handle_inventory_request(user_input, site_context=site_context)
     if inventory_response:
@@ -704,6 +1458,11 @@ def respond(user_input, site_context=None):
     scrape_response = handle_scrape_request(user_input)
     if scrape_response:
         return scrape_response
+    
+    # Check for balance inquiries (dynamic generation)
+    balance_response = handle_balance_request(user_input)
+    if balance_response:
+        return balance_response
     
     # Check for graph generation requests
     graph_response = handle_graph_request(user_input)

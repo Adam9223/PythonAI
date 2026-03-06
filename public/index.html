@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Chatbot - Test Interface</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -11,7 +15,7 @@
       <div class="chat-wrapper">
         <!-- Header -->
         <div class="header">
-          <h1>🤖 AI Chatbot</h1>
+          <h1>pythonAI prototype</h1>
           <p class="subtitle">Powered by Ollama + Python</p>
         </div>
 
@@ -44,6 +48,16 @@
       </div>
     </div>
 
+    <!-- Chart Modal -->
+    <div id="chartModal" class="chart-modal">
+      <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div id="modalChartTitle" class="modal-chart-title"></div>
+        <canvas id="modalChartCanvas"></canvas>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="chat.js"></script>
   </body>
 </html>
