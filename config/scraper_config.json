@@ -1,13 +1,16 @@
 {
   "company_website": {
-    "url": "https://clone.ulap.biz/api",
+    "url": "https://clone.ulap.biz/api/reports/inv/sc",
+    "is_json_api": true,
+    "api_data_path": "data",
     "selector": "div.content, p, table, tr, td, th",
-    "inventory_paths": ["/", "/reports/inv/sc", "/reports/inv/sc/graph"],
+    "inventory_paths": ["/api/reports/inv/sc"],
     "products_selector": "tr, .product-item, .inventory-row",
     "fallback_urls": [
       "https://clone.ulap.biz/inventory",
       "https://clone.ulap.biz/stock-card"
-    ]
+    ],
+    "description": "JSON API endpoint - requires Bearer token from frontend"
   },
   "example_site": {
     "url": "https://example.com",

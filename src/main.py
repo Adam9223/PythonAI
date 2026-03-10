@@ -481,9 +481,9 @@ def extract_relevant_text(content, query_tokens, max_length=500):
     return '. '.join(result) + '.' if result else content[:max_length]
 
 
-def get_company_scraper():
-    """Create scraper without backend proxy; frontend should handle proxying/access."""
-    return WebScraper(proxy=None)
+def get_company_scraper(auth_token=None):
+    """Create scraper with optional auth token from frontend."""
+    return WebScraper(proxy=None, auth_token=auth_token)
 
 
 def normalize_site_context(site_context):
@@ -744,7 +744,7 @@ def load_company_data():
     return None
 
 
-def handle_inventory_request(user_input, site_context=None):
+def handle_inventory_request(user_input, site_context=None, auth_token=None):
     """Handle inventory/product lookup requests from stock card (SC) or inventory pages."""
     normalized_input = normalize_text(user_input)
     inventory_triggers = [
@@ -765,36 +765,35 @@ def handle_inventory_request(user_input, site_context=None):
     if not (has_trigger and has_intent):
         return None
     
-    # Try loading from company_data.json first (no web scraping needed!)
-    company_data = load_company_data()
-    if company_data and 'inventory' in company_data:
-        inventory_items = company_data['inventory']
-        total = len(inventory_items)
-        company_name = company_data.get('company_name', 'Company Data')
-        last_updated = company_data.get('last_updated', 'N/A')
-        
-        # Format inventory items
-        lines = []
-        for idx, item in enumerate(inventory_items[:20], 1):
-            product = item.get('product_name', 'Unknown')
-            qty = item.get('quantity', 0)
-            unit = item.get('unit', 'units')
-            location = item.get('location', 'N/A')
-            status = item.get('status', '')
-            lines.append(f"{idx}. {product}: {qty} {unit} @ {location} [{status}]")
-        
-        more_note = f"\n...and {total - 20} more items." if total > 20 else ""
-        
-        return (
-            f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
-            f"Total products: {total}\n\n"
-            + "\n".join(lines) + more_note +
-            "\n\n💡 Update company_data.json to refresh this data."
-        )
-    
-    # Fallback to web scraping only if JSON file not available
+    # Try web scraping first (primary data source)
     if not SCRAPER_AVAILABLE:
-        return "Inventory lookup is not available. Please create company_data.json or install: pip install requests beautifulsoup4"
+        # Fallback to company_data.json only if web scraping not available
+        company_data = load_company_data()
+        if company_data and 'inventory' in company_data:
+            inventory_items = company_data['inventory']
+            total = len(inventory_items)
+            company_name = company_data.get('company_name', 'Company Data')
+            last_updated = company_data.get('last_updated', 'N/A')
+            
+            # Format inventory items
+            lines = []
+            for idx, item in enumerate(inventory_items[:20], 1):
+                product = item.get('product_name', 'Unknown')
+                qty = item.get('quantity', 0)
+                unit = item.get('unit', 'units')
+                location = item.get('location', 'N/A')
+                status = item.get('status', '')
+                lines.append(f"{idx}. {product}: {qty} {unit} @ {location} [{status}]")
+            
+            more_note = f"\n...and {total - 20} more items." if total > 20 else ""
+            
+            return (
+                f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
+                f"Total products: {total}\n\n"
+                + "\n".join(lines) + more_note +
+                "\n\n💡 Using fallback data from company_data.json. Install web scraping packages to fetch live data."
+            )
+        return "Inventory lookup is not available. Please install: pip install requests beautifulsoup4"
 
     normalized_site_context = normalize_site_context(site_context)
     if normalized_site_context and normalized_site_context.get("products"):
@@ -811,15 +810,41 @@ def handle_inventory_request(user_input, site_context=None):
             f"{lines}{more_note}"
         )
 
-    scraper = get_company_scraper()
+    scraper = get_company_scraper(auth_token=auth_token)
     result = scraper.scrape_inventory("company_website")
 
     if "error" in result:
+        # Fallback to company_data.json if web scraping fails
+        company_data = load_company_data()
+        if company_data and 'inventory' in company_data:
+            inventory_items = company_data['inventory']
+            total = len(inventory_items)
+            company_name = company_data.get('company_name', 'Company Data')
+            last_updated = company_data.get('last_updated', 'N/A')
+            
+            lines = []
+            for idx, item in enumerate(inventory_items[:20], 1):
+                product = item.get('product_name', 'Unknown')
+                qty = item.get('quantity', 0)
+                unit = item.get('unit', 'units')
+                location = item.get('location', 'N/A')
+                status = item.get('status', '')
+                lines.append(f"{idx}. {product}: {qty} {unit} @ {location} [{status}]")
+            
+            more_note = f"\n...and {total - 20} more items." if total > 20 else ""
+            
+            return (
+                f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
+                f"Total products: {total}\n\n"
+                + "\n".join(lines) + more_note +
+                "\n\n⚠️ Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json."
+            )
+        
         attempted = result.get("attempted_urls", [])
         attempted_preview = "\n".join([f"- {url}" for url in attempted[:5]]) if attempted else "- (no URLs attempted)"
         return (
-            "I couldn't find inventory products from the configured Stock Card/SC pages yet. "
-            "Please update `PythonAI/scraper_config.json` with your real company base URL and SC/inventory paths.\n\n"
+            "I couldn't find inventory products from the configured Stock Card/SC pages. "
+            "Please update `config/scraper_config.json` with your real company base URL and SC/inventory paths.\n\n"
             f"Attempted URLs:\n{attempted_preview}"
         )
 
@@ -1161,37 +1186,7 @@ def handle_balance_request(user_input):
     
     # Handle General Ledger balance queries
     if is_gl_query or (not is_stock_query and is_balance_query):
-        # Try loading from company_data.json first (preferred)
-        company_data = load_company_data()
-        if company_data and 'general_ledger' in company_data:
-            gl_info = company_data['general_ledger']
-            balance = gl_info.get('current_balance', 0)
-            currency = gl_info.get('currency', 'USD')
-            last_updated = gl_info.get('last_transaction_date', company_data.get('last_updated', 'N/A'))
-            
-            # Format balance
-            if balance >= 1_000_000:
-                balance_str = f"{currency} {balance / 1_000_000:.1f} million"
-            else:
-                balance_str = f"{currency} {balance:,.2f}"
-            
-            response = (
-                f"The current General Ledger balance is {balance_str}. "
-                f"Last updated: {last_updated}. "
-                f"\\n\\n💡 Update company_data.json to refresh this data."
-            )
-            
-            # Set context for subsequent chart generation
-            balance_context = {
-                'data_source': 'company_data',
-                'balance': balance,
-                'currency': currency,
-                'last_updated': last_updated
-            }
-            
-            return response
-        
-        # Fallback to gl_sample_data.json if company_data.json not available
+        # Try web scraping first, then fallback to gl_sample_data.json, then company_data.json as last resort
         if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
             try:
                 with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:

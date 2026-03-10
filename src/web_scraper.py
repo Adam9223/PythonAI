@@ -17,14 +17,16 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), "scraper_config.json")
 class WebScraper:
     """Web scraper with proxy support for gathering company data"""
     
-    def __init__(self, proxy: Optional[str] = None):
+    def __init__(self, proxy: Optional[str] = None, auth_token: Optional[str] = None):
         """
         Initialize the web scraper
         
         Args:
             proxy: Proxy URL in format 'http://ip:port' or 'https://ip:port'
+            auth_token: Bearer token for authenticated API requests
         """
         self.proxy = proxy
+        self.auth_token = auth_token
         self.session = requests.Session()
         
         if proxy:
@@ -38,6 +40,10 @@ class WebScraper:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
+        
+        # Add auth token if provided
+        if auth_token:
+            self.headers['Authorization'] = f'Bearer {auth_token}'
     
     def fetch_page(self, url: str) -> Optional[str]:
         """
@@ -83,17 +89,53 @@ class WebScraper:
             paragraphs = soup.find_all(['p', 'h1', 'h2', 'h3', 'div'])
             return [p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)]
     
-    def extract_data(self, url: str, selector: str = None) -> Dict:
+    def fetch_json_api(self, url: str) -> Dict:
         """
-        Fetch and extract data from a URL
+        Fetch JSON data from an API endpoint
+        
+        Args:
+            url: The API URL to fetch
+            
+        Returns:
+            JSON data as dictionary, or error dict if failed
+        """
+        try:
+            response = self.session.get(
+                url, 
+                headers=self.headers, 
+                timeout=self.timeout,
+                verify=True
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            return {"error": f"API request failed: {str(e)}", "url": url}
+        except json.JSONDecodeError as e:
+            return {"error": f"Invalid JSON response: {str(e)}", "url": url}
+    
+    def extract_data(self, url: str, selector: str = None, is_json_api: bool = False) -> Dict:
+        """
+        Fetch and extract data from a URL (HTML or JSON API)
         
         Args:
             url: The URL to scrape
-            selector: CSS selector for targeting specific content
+            selector: CSS selector for targeting specific content (HTML mode)
+            is_json_api: If True, treat as JSON API endpoint instead of HTML
             
         Returns:
             Dictionary with extracted data
         """
+        if is_json_api:
+            data = self.fetch_json_api(url)
+            if "error" in data:
+                return data
+            return {
+                "url": url,
+                "data": data,
+                "content": data.get("data", []) if isinstance(data.get("data"), list) else [data],
+                "total_items": len(data.get("data", [])) if isinstance(data.get("data"), list) else 1
+            }
+        
         html = self.fetch_page(url)
         
         if not html:
@@ -166,10 +208,33 @@ class WebScraper:
         site_config = config[config_name]
         base_url = site_config.get("url", "").strip()
         selector = site_config.get("selector")
+        is_json_api = site_config.get("is_json_api", False)
+        api_data_path = site_config.get("api_data_path", "data")
 
         if not base_url:
             return {"error": "Missing 'url' in scraper config"}
+        
+        # If JSON API mode, fetch directly
+        if is_json_api:
+            result = self.fetch_json_api(base_url)
+            if "error" in result:
+                return result
+            
+            # Extract products from JSON response
+            products_data = result.get(api_data_path, result)
+            if isinstance(products_data, list):
+                products = [item.get("product_name", str(item)) if isinstance(item, dict) else str(item) for item in products_data]
+            else:
+                products = [str(products_data)]
+            
+            return {
+                "products": products,
+                "total_products": len(products),
+                "source_url": base_url,
+                "data_type": "json_api"
+            }
 
+        # HTML scraping mode (existing logic)
         default_paths = ["/sc", "/stock-card", "/stockcard", "/inventory", "/products"]
         configured_paths = site_config.get("inventory_paths", [])
         sc_path = site_config.get("sc_path")

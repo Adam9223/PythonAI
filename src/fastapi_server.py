@@ -92,6 +92,7 @@ def verify_token(authorization: str = Header(None)) -> str:
 class ChatRequest(BaseModel):
     message: str
     use_live_data: Optional[bool] = False
+    user_auth_token: Optional[str] = None  # Frontend's auth token for target website
 
 
 class ChatResponse(BaseModel):
@@ -116,6 +117,12 @@ class APIKeyResponse(BaseModel):
 class BalanceRequest(BaseModel):
     data_source: str = "general_ledger"  # "general_ledger" or "stock_card"
     use_live_data: Optional[bool] = False
+    user_auth_token: Optional[str] = None  # Frontend's auth token for target website
+
+
+class InventoryRequest(BaseModel):
+    category: Optional[str] = "all"
+    user_auth_token: Optional[str] = None  # Frontend's auth token for target website
 
 
 class ChartTypeRequest(BaseModel):
@@ -349,13 +356,43 @@ async def get_chart(
         )
 
 
-@app.get("/api/inventory")
+@app.post("/api/inventory")
 async def get_inventory(
-    search_term: Optional[str] = None,
+    request: InventoryRequest,
     api_key: str = Depends(verify_token)
 ):
     """
     Get inventory/stock card information
+    
+    Body:
+    - category: Optional category filter (default: "all")
+    - user_auth_token: Optional auth token from frontend for target website
+    """
+    try:
+        prompt = f"Show me the current inventory status"
+        
+        response = handle_inventory_request(prompt, auth_token=request.user_auth_token)
+        
+        return {
+            "success": True,
+            "data": response,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+# Keep GET endpoint for backward compatibility
+@app.get("/api/inventory")
+async def get_inventory_legacy(
+    search_term: Optional[str] = None,
+    api_key: str = Depends(verify_token)
+):
+    """
+    Get inventory/stock card information (legacy GET endpoint)
     
     Parameters:
     - search_term: Optional search term for specific items
