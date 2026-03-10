@@ -499,11 +499,22 @@ def parse_cookie_header(cookie_header):
 
 def get_company_scraper(auth_context=None):
     """Create scraper with optional auth context from frontend."""
+    # Load scraper config
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "scraper_config.json")
+    config = {}
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                full_config = json.load(f)
+                config = full_config.get('company_website', {})
+    except Exception:
+        pass
+    
     if isinstance(auth_context, str):
-        return WebScraper(proxy=None, auth_token=auth_context)
+        return WebScraper(proxy=None, auth_token=auth_context, config=config)
 
     if not isinstance(auth_context, dict):
-        return WebScraper(proxy=None)
+        return WebScraper(proxy=None, config=config)
 
     auth_token = auth_context.get("user_auth_token")
     auth_header_name = auth_context.get("auth_header_name") or "Authorization"
@@ -522,6 +533,7 @@ def get_company_scraper(auth_context=None):
         csrf_token=csrf_token,
         csrf_header_name=csrf_header_name,
         extra_headers=extra_headers,
+        config=config,
     )
 
 

@@ -26,6 +26,7 @@ class WebScraper:
         csrf_token: Optional[str] = None,
         csrf_header_name: str = "X-CSRF-Token",
         extra_headers: Optional[Dict[str, str]] = None,
+        config: Optional[Dict] = None,
     ):
         """
         Initialize the web scraper
@@ -38,9 +39,11 @@ class WebScraper:
             csrf_token: Optional CSRF token value
             csrf_header_name: Header name for CSRF token
             extra_headers: Optional additional headers to forward
+            config: Optional scraper config dict with fixed API settings
         """
         self.proxy = proxy
         self.auth_token = auth_token
+        self.config = config or {}
         self.session = requests.Session()
         
         if proxy:
@@ -55,7 +58,18 @@ class WebScraper:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        # Add auth token if provided
+        # Load fixed headers from config first
+        config_headers = self.config.get('api_fixed_headers', {})
+        if isinstance(config_headers, dict):
+            self.headers.update(config_headers)
+        
+        # Add fixed auth from config (runtime auth_token overrides this)
+        config_auth_header = self.config.get('api_fixed_auth_header')
+        config_auth_token = self.config.get('api_fixed_auth_token')
+        if not auth_token and config_auth_token and config_auth_header:
+            self.headers[config_auth_header] = config_auth_token
+        
+        # Add runtime auth token if provided (overrides config)
         if auth_token:
             header_key = auth_header_name or "Authorization"
             if header_key.lower() == "authorization" and not auth_token.lower().startswith("bearer "):
@@ -67,13 +81,22 @@ class WebScraper:
         if csrf_token:
             self.headers[csrf_header_name or "X-CSRF-Token"] = csrf_token
 
-        # Add any extra headers
+        # Add any extra headers (runtime overrides config)
         if isinstance(extra_headers, dict):
             for key, value in extra_headers.items():
                 if key and value is not None:
                     self.headers[str(key)] = str(value)
 
-        # Forward cookies for session-based auth
+        # Forward cookies - merge config and runtime (runtime adds to config)
+        config_cookie_str = self.config.get('api_fixed_cookie')
+        if config_cookie_str:
+            # Parse cookie string like "devID=6515450; session=abc"
+            for cookie_pair in config_cookie_str.split(';'):
+                cookie_pair = cookie_pair.strip()
+                if '=' in cookie_pair:
+                    name, value = cookie_pair.split('=', 1)
+                    self.session.cookies.set(name.strip(), value.strip())
+        
         if isinstance(cookies, dict):
             self.session.cookies.update(cookies)
     
@@ -140,7 +163,11 @@ class WebScraper:
                 "verify": True
             }
 
-            if request_method == "POST" and isinstance(payload, dict):
+            # Use config default body if no payload provided
+            if payload is None and request_method in ["POST", "PUT", "PATCH"]:
+                payload = self.config.get('api_default_body', {})
+
+            if request_method in ["POST", "PUT", "PATCH"] and isinstance(payload, dict):
                 request_kwargs["json"] = payload
 
             response = self.session.request(request_method, **request_kwargs)

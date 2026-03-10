@@ -4,6 +4,22 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_data_path": "data",
+    "api_fixed_auth_header": "x-access-tokens",
+    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJiaXoiOiJrRVEiLCJpeFNhbmRib3giOjAsImV4cCI6MTc3MzE2NTA4NX0.Jo1OrGfr64YjDKetGH5VWmeD7EdOsf9yeTxA-GYchzU",
+    "api_fixed_cookie": "devID=6515450",
+    "api_fixed_headers": {
+      "Referer": "https://clone.ulap.biz/app/reports/sc",
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    "api_default_body": {
+      "ixProd": 15583,
+      "dt1": "2026-03-01T00:00:00+08:00",
+      "dt2": "2026-03-31T23:59:59+08:00",
+      "ixWH": 4282,
+      "SN": "",
+      "SN2": ""
+    },
     "selector": "div.content, p, table, tr, td, th",
     "inventory_paths": ["/api/reports/inv/sc"],
     "products_selector": "tr, .product-item, .inventory-row",
@@ -11,7 +27,7 @@
       "https://clone.ulap.biz/inventory",
       "https://clone.ulap.biz/stock-card"
     ],
-    "description": "JSON API endpoint - requires Bearer token from frontend"
+    "description": "JSON API endpoint - uses x-access-tokens header (plural)"
   },
   "example_site": {
     "url": "https://example.com",
