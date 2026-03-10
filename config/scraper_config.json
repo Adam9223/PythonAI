@@ -2,6 +2,7 @@
   "company_website": {
     "url": "https://clone.ulap.biz/api/reports/inv/sc",
     "is_json_api": true,
+    "api_method": "POST",
     "api_data_path": "data",
     "selector": "div.content, p, table, tr, td, th",
     "inventory_paths": ["/api/reports/inv/sc"],

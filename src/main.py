@@ -481,9 +481,48 @@ def extract_relevant_text(content, query_tokens, max_length=500):
     return '. '.join(result) + '.' if result else content[:max_length]
 
 
-def get_company_scraper(auth_token=None):
-    """Create scraper with optional auth token from frontend."""
-    return WebScraper(proxy=None, auth_token=auth_token)
+def parse_cookie_header(cookie_header):
+    """Parse a Cookie header string into a dict for requests session cookies."""
+    if not cookie_header or not isinstance(cookie_header, str):
+        return {}
+
+    cookies = {}
+    parts = cookie_header.split(";")
+    for part in parts:
+        item = part.strip()
+        if not item or "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        cookies[key.strip()] = value.strip()
+    return cookies
+
+
+def get_company_scraper(auth_context=None):
+    """Create scraper with optional auth context from frontend."""
+    if isinstance(auth_context, str):
+        return WebScraper(proxy=None, auth_token=auth_context)
+
+    if not isinstance(auth_context, dict):
+        return WebScraper(proxy=None)
+
+    auth_token = auth_context.get("user_auth_token")
+    auth_header_name = auth_context.get("auth_header_name") or "Authorization"
+    csrf_token = auth_context.get("csrf_token")
+    csrf_header_name = auth_context.get("csrf_header_name") or "X-CSRF-Token"
+    extra_headers = auth_context.get("extra_headers") if isinstance(auth_context.get("extra_headers"), dict) else None
+
+    raw_cookie = auth_context.get("user_cookie")
+    cookies = raw_cookie if isinstance(raw_cookie, dict) else parse_cookie_header(raw_cookie)
+
+    return WebScraper(
+        proxy=None,
+        auth_token=auth_token,
+        auth_header_name=auth_header_name,
+        cookies=cookies,
+        csrf_token=csrf_token,
+        csrf_header_name=csrf_header_name,
+        extra_headers=extra_headers,
+    )
 
 
 def normalize_site_context(site_context):
@@ -744,7 +783,7 @@ def load_company_data():
     return None
 
 
-def handle_inventory_request(user_input, site_context=None, auth_token=None):
+def handle_inventory_request(user_input, site_context=None, auth_token=None, auth_context=None):
     """Handle inventory/product lookup requests from stock card (SC) or inventory pages."""
     normalized_input = normalize_text(user_input)
     inventory_triggers = [
@@ -810,10 +849,29 @@ def handle_inventory_request(user_input, site_context=None, auth_token=None):
             f"{lines}{more_note}"
         )
 
-    scraper = get_company_scraper(auth_token=auth_token)
+    resolved_auth_context = auth_context if isinstance(auth_context, dict) else auth_token
+    scraper = get_company_scraper(auth_context=resolved_auth_context)
     result = scraper.scrape_inventory("company_website")
 
     if "error" in result:
+        upstream_error = result.get("error", "Unknown scraping error")
+        upstream_status = result.get("status_code")
+        upstream_method = result.get("method")
+        upstream_url = result.get("url") or result.get("source_url")
+        upstream_text = result.get("response_text", "")
+
+        diagnostics = ""
+        if upstream_url:
+            diagnostics += f"\nUpstream URL: {upstream_url}"
+        if upstream_method:
+            diagnostics += f"\nMethod: {upstream_method}"
+        if upstream_status is not None:
+            diagnostics += f"\nStatus: {upstream_status}"
+        if upstream_error:
+            diagnostics += f"\nError: {upstream_error}"
+        if upstream_text:
+            diagnostics += f"\nResponse: {upstream_text[:220]}"
+
         # Fallback to company_data.json if web scraping fails
         company_data = load_company_data()
         if company_data and 'inventory' in company_data:
@@ -838,6 +896,7 @@ def handle_inventory_request(user_input, site_context=None, auth_token=None):
                 f"Total products: {total}\n\n"
                 + "\n".join(lines) + more_note +
                 "\n\n⚠️ Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json."
+                + (f"\n\nDiagnostics:{diagnostics}" if diagnostics else "")
             )
         
         attempted = result.get("attempted_urls", [])
@@ -846,6 +905,7 @@ def handle_inventory_request(user_input, site_context=None, auth_token=None):
             "I couldn't find inventory products from the configured Stock Card/SC pages. "
             "Please update `config/scraper_config.json` with your real company base URL and SC/inventory paths.\n\n"
             f"Attempted URLs:\n{attempted_preview}"
+            + (f"\n\nDiagnostics:{diagnostics}" if diagnostics else "")
         )
 
     products = result.get("products", [])

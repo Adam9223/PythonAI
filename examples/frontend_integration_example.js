@@ -25,11 +25,27 @@ class AIBackendClient {
     return access_token;
   }
 
-  // Step 2: Get inventory using YOUR frontend's token
-  async getInventory(userToken) {
+  // Step 2: Get inventory using YOUR frontend auth context
+  // authContext supports:
+  // - userToken (jwt)
+  // - userCookie (raw cookie header string)
+  // - csrfToken
+  // - authHeaderName (e.g. Authorization, x-access-token)
+  // - csrfHeaderName
+  // - extraHeaders (object)
+  async getInventory(authContext = {}) {
     if (!this.apiAccessToken) {
       await this.authenticate();
     }
+
+    const {
+      userToken = null,
+      userCookie = null,
+      csrfToken = null,
+      authHeaderName = 'Authorization',
+      csrfHeaderName = 'X-CSRF-Token',
+      extraHeaders = null,
+    } = authContext;
 
     const response = await fetch(`${this.backendUrl}/api/inventory`, {
       method: 'POST',
@@ -39,7 +55,12 @@ class AIBackendClient {
       },
       body: JSON.stringify({
         category: 'all',
-        user_auth_token: userToken // YOUR token for clone.ulap.biz
+        user_auth_token: userToken,
+        user_cookie: userCookie,
+        csrf_token: csrfToken,
+        auth_header_name: authHeaderName,
+        csrf_header_name: csrfHeaderName,
+        extra_headers: extraHeaders
       })
     });
 
@@ -96,6 +117,8 @@ class AIBackendClient {
 async function example() {
   // Your existing login code gets this token
   const userTokenForUlap = localStorage.getItem('ulap_token'); // or however you store it
+  const csrfToken = localStorage.getItem('csrf_token');
+  const userCookie = document.cookie; // if frontend request relies on session cookie
   
   // Create AI client
   const aiClient = new AIBackendClient('http://localhost:8000');
@@ -103,7 +126,13 @@ async function example() {
   // Use the AI backend with your token
   try {
     // Get inventory
-    const inventory = await aiClient.getInventory(userTokenForUlap);
+    const inventory = await aiClient.getInventory({
+      userToken: userTokenForUlap,
+      userCookie,
+      csrfToken,
+      authHeaderName: 'Authorization',
+      csrfHeaderName: 'X-CSRF-Token'
+    });
     console.log('Inventory:', inventory);
     
     // Chat about the data
@@ -136,7 +165,11 @@ function InventoryComponent() {
     setLoading(true);
     try {
       const aiClient = new AIBackendClient('http://localhost:8000');
-      const result = await aiClient.getInventory(userToken);
+      const result = await aiClient.getInventory({
+        userToken,
+        userCookie: document.cookie,
+        csrfToken: localStorage.getItem('csrf_token')
+      });
       setInventory(result);
     } catch (error) {
       console.error('Failed to fetch inventory:', error);

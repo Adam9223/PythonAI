@@ -123,6 +123,11 @@ class BalanceRequest(BaseModel):
 class InventoryRequest(BaseModel):
     category: Optional[str] = "all"
     user_auth_token: Optional[str] = None  # Frontend's auth token for target website
+    user_cookie: Optional[str] = None  # Raw Cookie header from frontend session
+    csrf_token: Optional[str] = None
+    auth_header_name: Optional[str] = "Authorization"
+    csrf_header_name: Optional[str] = "X-CSRF-Token"
+    extra_headers: Optional[Dict[str, str]] = None
 
 
 class ChartTypeRequest(BaseModel):
@@ -367,11 +372,24 @@ async def get_inventory(
     Body:
     - category: Optional category filter (default: "all")
     - user_auth_token: Optional auth token from frontend for target website
+    - user_cookie: Optional raw Cookie header from frontend session
+    - csrf_token: Optional CSRF token value
+    - auth_header_name: Optional auth header name override (e.g., x-access-token)
+    - csrf_header_name: Optional CSRF header name override
+    - extra_headers: Optional additional headers map
     """
     try:
         prompt = f"Show me the current inventory status"
+        auth_context = {
+            "user_auth_token": request.user_auth_token,
+            "user_cookie": request.user_cookie,
+            "csrf_token": request.csrf_token,
+            "auth_header_name": request.auth_header_name,
+            "csrf_header_name": request.csrf_header_name,
+            "extra_headers": request.extra_headers,
+        }
         
-        response = handle_inventory_request(prompt, auth_token=request.user_auth_token)
+        response = handle_inventory_request(prompt, auth_context=auth_context)
         
         return {
             "success": True,

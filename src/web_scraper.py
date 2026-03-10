@@ -11,19 +11,33 @@ from typing import Dict, List, Optional
 from urllib.parse import urljoin
 
 # Configuration file for storing website URLs and proxy settings
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "scraper_config.json")
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "scraper_config.json")
 
 
 class WebScraper:
     """Web scraper with proxy support for gathering company data"""
     
-    def __init__(self, proxy: Optional[str] = None, auth_token: Optional[str] = None):
+    def __init__(
+        self,
+        proxy: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        auth_header_name: str = "Authorization",
+        cookies: Optional[Dict[str, str]] = None,
+        csrf_token: Optional[str] = None,
+        csrf_header_name: str = "X-CSRF-Token",
+        extra_headers: Optional[Dict[str, str]] = None,
+    ):
         """
         Initialize the web scraper
         
         Args:
             proxy: Proxy URL in format 'http://ip:port' or 'https://ip:port'
-            auth_token: Bearer token for authenticated API requests
+            auth_token: Token for authenticated API requests
+            auth_header_name: Header name for auth token (e.g., Authorization, x-access-token)
+            cookies: Optional cookies to forward for session-based auth
+            csrf_token: Optional CSRF token value
+            csrf_header_name: Header name for CSRF token
+            extra_headers: Optional additional headers to forward
         """
         self.proxy = proxy
         self.auth_token = auth_token
@@ -43,7 +57,25 @@ class WebScraper:
         
         # Add auth token if provided
         if auth_token:
-            self.headers['Authorization'] = f'Bearer {auth_token}'
+            header_key = auth_header_name or "Authorization"
+            if header_key.lower() == "authorization" and not auth_token.lower().startswith("bearer "):
+                self.headers[header_key] = f"Bearer {auth_token}"
+            else:
+                self.headers[header_key] = auth_token
+
+        # Add CSRF token header if provided
+        if csrf_token:
+            self.headers[csrf_header_name or "X-CSRF-Token"] = csrf_token
+
+        # Add any extra headers
+        if isinstance(extra_headers, dict):
+            for key, value in extra_headers.items():
+                if key and value is not None:
+                    self.headers[str(key)] = str(value)
+
+        # Forward cookies for session-based auth
+        if isinstance(cookies, dict):
+            self.session.cookies.update(cookies)
     
     def fetch_page(self, url: str) -> Optional[str]:
         """
@@ -89,7 +121,7 @@ class WebScraper:
             paragraphs = soup.find_all(['p', 'h1', 'h2', 'h3', 'div'])
             return [p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)]
     
-    def fetch_json_api(self, url: str) -> Dict:
+    def fetch_json_api(self, url: str, method: str = "GET", payload: Optional[Dict] = None) -> Dict:
         """
         Fetch JSON data from an API endpoint
         
@@ -100,18 +132,42 @@ class WebScraper:
             JSON data as dictionary, or error dict if failed
         """
         try:
-            response = self.session.get(
-                url, 
-                headers=self.headers, 
-                timeout=self.timeout,
-                verify=True
-            )
-            response.raise_for_status()
+            request_method = method.upper() if isinstance(method, str) else "GET"
+            request_kwargs = {
+                "url": url,
+                "headers": self.headers,
+                "timeout": self.timeout,
+                "verify": True
+            }
+
+            if request_method == "POST" and isinstance(payload, dict):
+                request_kwargs["json"] = payload
+
+            response = self.session.request(request_method, **request_kwargs)
+
+            if response.status_code >= 400:
+                body_preview = (response.text or "")[:500]
+                return {
+                    "error": f"API request failed with status {response.status_code}",
+                    "url": url,
+                    "method": request_method,
+                    "status_code": response.status_code,
+                    "response_text": body_preview,
+                }
+
             return response.json()
         except requests.RequestException as e:
-            return {"error": f"API request failed: {str(e)}", "url": url}
+            return {
+                "error": f"API request failed: {str(e)}",
+                "url": url,
+                "method": method.upper() if isinstance(method, str) else "GET",
+            }
         except json.JSONDecodeError as e:
-            return {"error": f"Invalid JSON response: {str(e)}", "url": url}
+            return {
+                "error": f"Invalid JSON response: {str(e)}",
+                "url": url,
+                "method": method.upper() if isinstance(method, str) else "GET",
+            }
     
     def extract_data(self, url: str, selector: str = None, is_json_api: bool = False) -> Dict:
         """
@@ -210,14 +266,17 @@ class WebScraper:
         selector = site_config.get("selector")
         is_json_api = site_config.get("is_json_api", False)
         api_data_path = site_config.get("api_data_path", "data")
+        api_method = site_config.get("api_method", "GET")
+        api_payload = site_config.get("api_payload")
 
         if not base_url:
             return {"error": "Missing 'url' in scraper config"}
         
         # If JSON API mode, fetch directly
         if is_json_api:
-            result = self.fetch_json_api(base_url)
+            result = self.fetch_json_api(base_url, method=api_method, payload=api_payload)
             if "error" in result:
+                result["attempted_urls"] = [base_url]
                 return result
             
             # Extract products from JSON response
