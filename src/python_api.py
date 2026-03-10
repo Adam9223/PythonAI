@@ -14,7 +14,10 @@ old_stdout = sys.stdout
 sys.stdout = StringIO()
 
 try:
-    from main import respond, store_conversation, extract_context_from_input, build_context_reminder
+    try:
+        from .main import respond, store_conversation, extract_context_from_input, build_context_reminder
+    except ImportError:
+        from main import respond, store_conversation, extract_context_from_input, build_context_reminder
 finally:
     sys.stdout = old_stdout
 

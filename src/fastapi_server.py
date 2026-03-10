@@ -14,12 +14,12 @@ import secrets
 from datetime import datetime, timedelta
 import jwt
 
-from main import respond, handle_balance_request, handle_inventory_request
+from .main import respond, handle_balance_request, handle_inventory_request
 
 # Security configuration
 SECRET_KEY = os.getenv("API_SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
-API_KEYS_FILE = "api_keys.json"
+API_KEYS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "api_keys.json")
 
 # Initialize FastAPI app
 app = FastAPI(

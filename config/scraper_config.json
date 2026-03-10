@@ -1,0 +1,16 @@
+{
+  "company_website": {
+    "url": "https://clone.ulap.biz/api",
+    "selector": "div.content, p, table, tr, td, th",
+    "inventory_paths": ["/", "/reports/inv/sc", "/reports/inv/sc/graph"],
+    "products_selector": "tr, .product-item, .inventory-row",
+    "fallback_urls": [
+      "https://clone.ulap.biz/inventory",
+      "https://clone.ulap.biz/stock-card"
+    ]
+  },
+  "example_site": {
+    "url": "https://example.com",
+    "selector": "p"
+  }
+}

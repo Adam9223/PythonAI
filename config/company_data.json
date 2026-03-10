@@ -1,0 +1,49 @@
+{
+  "company_name": "Your Company Name",
+  "last_updated": "2026-03-06",
+
+  "inventory": [
+    {
+      "product_code": "WGT-001",
+      "product_name": "Widget A",
+      "quantity": 150,
+      "unit": "pcs",
+      "location": "Warehouse 1",
+      "reorder_level": 50,
+      "status": "In Stock"
+    },
+    {
+      "product_code": "WGT-002",
+      "product_name": "Widget B",
+      "quantity": 80,
+      "unit": "pcs",
+      "location": "Warehouse 2",
+      "reorder_level": 30,
+      "status": "In Stock"
+    },
+    {
+      "product_code": "GAD-001",
+      "product_name": "Gadget X",
+      "quantity": 25,
+      "unit": "pcs",
+      "location": "Warehouse 1",
+      "reorder_level": 40,
+      "status": "Low Stock"
+    }
+  ],
+
+  "general_ledger": {
+    "current_balance": 336100000,
+    "currency": "PHP",
+    "fiscal_year": "2026",
+    "last_transaction_date": "2026-03-05",
+    "account_status": "Active"
+  },
+
+  "financial_summary": {
+    "total_assets": 450000000,
+    "total_liabilities": 113900000,
+    "equity": 336100000,
+    "currency": "PHP"
+  }
+}

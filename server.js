@@ -2,7 +2,7 @@ const express = require("express");
 const { spawn } = require("child_process");
 const path = require("path");
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -12,7 +12,7 @@ let pythonProcess = null;
 
 // Start Python child process
 function startPythonProcess() {
-  pythonProcess = spawn("python3", [path.join(__dirname, "python_api.py")]);
+  pythonProcess = spawn("python3", [path.join(__dirname, "src", "python_api.py")]);
 
   pythonProcess.stdout.on("data", (data) => {
     console.log(`[Python] ${data}`);
@@ -37,7 +37,7 @@ app.post("/api/chat", async (req, res) => {
 
     let options = {
       pythonPath: "/usr/bin/python3",
-      scriptPath: __dirname,
+      scriptPath: path.join(__dirname, "src"),
       args: [message],
     };
 

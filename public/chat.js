@@ -9,6 +9,136 @@ const chatForm = document.getElementById("chatForm");
 const chartInstances = new Map();
 let modalChartInstance = null;
 
+function getSafeChartType(rawType) {
+  const type = String(rawType || "bar").toLowerCase();
+  const supported = new Set([
+    "bar",
+    "line",
+    "pie",
+    "doughnut",
+    "radar",
+    "polararea",
+    "scatter",
+    "bubble",
+  ]);
+
+  if (!supported.has(type)) {
+    return "bar";
+  }
+
+  return type === "polararea" ? "polarArea" : type;
+}
+
+function getChartScales(type) {
+  const cartesianTypes = new Set(["bar", "line", "scatter", "bubble"]);
+  if (!cartesianTypes.has(type)) {
+    return undefined;
+  }
+
+  return {
+    x: {
+      beginAtZero: true,
+    },
+    y: {
+      beginAtZero: true,
+    },
+  };
+}
+
+function cloneChartData(data) {
+  if (!data || typeof data !== "object") {
+    return {};
+  }
+
+  try {
+    if (typeof structuredClone === "function") {
+      return structuredClone(data);
+    }
+  } catch (error) {
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(data));
+  } catch (error) {
+    return {};
+  }
+}
+
+function sanitizeNumericDatasets(data) {
+  const normalized = data && typeof data === "object" ? data : {};
+  const datasets = Array.isArray(normalized.datasets) ? normalized.datasets : [];
+
+  const cleanedDatasets = datasets.map((dataset) => {
+    const values = Array.isArray(dataset.data) ? dataset.data : [];
+    return {
+      ...dataset,
+      data: values.map((value) => {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+          return 0;
+        }
+        return value;
+      }),
+    };
+  });
+
+  const maxLength = cleanedDatasets.reduce(
+    (length, dataset) => Math.max(length, dataset.data.length),
+    0,
+  );
+
+  let labels = Array.isArray(normalized.labels) ? normalized.labels : [];
+  if (maxLength > 0 && labels.length < maxLength) {
+    labels = Array.from({ length: maxLength }, (_, index) =>
+      labels[index] !== undefined ? labels[index] : `Item ${index + 1}`,
+    );
+  }
+
+  return {
+    ...normalized,
+    labels,
+    datasets: cleanedDatasets,
+  };
+}
+
+function normalizeChartPayload(rawData, chartType) {
+  const data = sanitizeNumericDatasets(cloneChartData(rawData));
+  const datasets = Array.isArray(data.datasets) ? data.datasets : [];
+
+  if (chartType === "scatter" || chartType === "bubble") {
+    const normalizedDatasets = datasets.map((dataset) => {
+      const values = Array.isArray(dataset.data) ? dataset.data : [];
+      const pointLike = values.every(
+        (value) =>
+          value &&
+          typeof value === "object" &&
+          Object.prototype.hasOwnProperty.call(value, "x") &&
+          Object.prototype.hasOwnProperty.call(value, "y"),
+      );
+
+      if (pointLike) {
+        return dataset;
+      }
+
+      const points = values.map((value, index) => ({ x: index + 1, y: value }));
+      return {
+        ...dataset,
+        data: points,
+      };
+    });
+
+    return {
+      ...data,
+      labels: undefined,
+      datasets: normalizedDatasets,
+    };
+  }
+
+  return {
+    ...data,
+    datasets,
+  };
+}
+
 // Auto-scroll to bottom
 function scrollToBottom() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -92,8 +222,13 @@ function renderChart(container, chartData) {
 
   try {
     const ctx = canvas.getContext("2d");
-    const chartType = chartData.chartType || chartData.type || "bar";
-    const data = chartData.chartData || chartData.data || chartData;
+    const chartType = getSafeChartType(
+      chartData.chartType || chartData.type || "bar",
+    );
+    const data = normalizeChartPayload(
+      chartData.chartData || chartData.data || chartData,
+      chartType,
+    );
 
     // Create the chart
     const chart = new Chart(ctx, {
@@ -111,14 +246,7 @@ function renderChart(container, chartData) {
             display: false,
           },
         },
-        scales:
-          chartType !== "pie" && chartType !== "doughnut"
-            ? {
-                y: {
-                  beginAtZero: true,
-                },
-              }
-            : undefined,
+        scales: getChartScales(chartType),
       },
     });
 
@@ -148,8 +276,13 @@ function openChartModal(chartData) {
 
   // Create enlarged chart
   const ctx = modalCanvas.getContext("2d");
-  const chartType = chartData.chartType || chartData.type || "bar";
-  const data = chartData.chartData || chartData.data || chartData;
+  const chartType = getSafeChartType(
+    chartData.chartType || chartData.type || "bar",
+  );
+  const data = normalizeChartPayload(
+    chartData.chartData || chartData.data || chartData,
+    chartType,
+  );
 
   modalChartInstance = new Chart(ctx, {
     type: chartType,
@@ -171,26 +304,7 @@ function openChartModal(chartData) {
           display: false,
         },
       },
-      scales:
-        chartType !== "pie" && chartType !== "doughnut"
-          ? {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  font: {
-                    size: 12,
-                  },
-                },
-              },
-              x: {
-                ticks: {
-                  font: {
-                    size: 12,
-                  },
-                },
-              },
-            }
-          : undefined,
+      scales: getChartScales(chartType),
     },
   });
 

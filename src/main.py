@@ -9,17 +9,24 @@ from difflib import SequenceMatcher
 
 # Import new modules for web scraping and graph generation
 try:
-    from web_scraper import WebScraper
-    from graph_generator import GraphGenerator
+    from .web_scraper import WebScraper
+    from .graph_generator import GraphGenerator
     SCRAPER_AVAILABLE = True
     GRAPH_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Some features unavailable - {e}")
-    SCRAPER_AVAILABLE = False
-    GRAPH_AVAILABLE = False
+except ImportError:
+    # Fallback for direct script execution
+    try:
+        from web_scraper import WebScraper
+        from graph_generator import GraphGenerator
+        SCRAPER_AVAILABLE = True
+        GRAPH_AVAILABLE = True
+    except ImportError as e:
+        print(f"Warning: Some features unavailable - {e}")
+        SCRAPER_AVAILABLE = False
+        GRAPH_AVAILABLE = False
 
-FILE_NAME = "knowledge.json"
-ARTICLES_DB = "articles_db.json"
+FILE_NAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "knowledge.json")
+ARTICLES_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "articles_db.json")
 
 # Global cache for articles database
 articles_cache = None
@@ -38,7 +45,7 @@ extracted_context = {  # Store extracted facts and entities
     'facts': []  # e.g., 'User is interested in GL data'
 }
 MAX_HISTORY = 20  # Keep most recent 20 exchanges
-CONVERSATION_STORE = "conversation_store.json"
+CONVERSATION_STORE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "conversation_store.json")
 
 print("AI Assistant - Retrieval-Augmented Generation System")
 
@@ -584,9 +591,9 @@ def get_live_gl_data(force_refresh=False):
         print(f"Error fetching live GL data: {e}")
     
     # Fallback to sample data
-    if os.path.exists('gl_sample_data.json'):
+    if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
         try:
-            with open('gl_sample_data.json', 'r') as f:
+            with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:
                 sample_data = json.load(f)
                 return {
                     'source': 'sample_data',
@@ -718,18 +725,27 @@ def handle_scrape_request(user_input):
         data = scraper.scrape_with_config('company_website')
         
         if "error" in data:
-            return f"Please configure the company website in scraper_config.json first."
+            return f"Please configure the company website in config/scraper_config.json first."
         
         return f"Scraped company website: {data['total_items']} items found"
     
     return None
 
 
+def load_company_data():
+    """Load data from company_data.json file (alternative to web scraping)"""
+    company_data_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'company_data.json')
+    if os.path.exists(company_data_file):
+        try:
+            with open(company_data_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading company_data.json: {e}")
+    return None
+
+
 def handle_inventory_request(user_input, site_context=None):
     """Handle inventory/product lookup requests from stock card (SC) or inventory pages."""
-    if not SCRAPER_AVAILABLE:
-        return "Inventory lookup is not available. Please install required packages: pip install requests beautifulsoup4"
-
     normalized_input = normalize_text(user_input)
     inventory_triggers = [
         "inventory",
@@ -748,6 +764,37 @@ def handle_inventory_request(user_input, site_context=None):
 
     if not (has_trigger and has_intent):
         return None
+    
+    # Try loading from company_data.json first (no web scraping needed!)
+    company_data = load_company_data()
+    if company_data and 'inventory' in company_data:
+        inventory_items = company_data['inventory']
+        total = len(inventory_items)
+        company_name = company_data.get('company_name', 'Company Data')
+        last_updated = company_data.get('last_updated', 'N/A')
+        
+        # Format inventory items
+        lines = []
+        for idx, item in enumerate(inventory_items[:20], 1):
+            product = item.get('product_name', 'Unknown')
+            qty = item.get('quantity', 0)
+            unit = item.get('unit', 'units')
+            location = item.get('location', 'N/A')
+            status = item.get('status', '')
+            lines.append(f"{idx}. {product}: {qty} {unit} @ {location} [{status}]")
+        
+        more_note = f"\n...and {total - 20} more items." if total > 20 else ""
+        
+        return (
+            f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
+            f"Total products: {total}\n\n"
+            + "\n".join(lines) + more_note +
+            "\n\n💡 Update company_data.json to refresh this data."
+        )
+    
+    # Fallback to web scraping only if JSON file not available
+    if not SCRAPER_AVAILABLE:
+        return "Inventory lookup is not available. Please create company_data.json or install: pip install requests beautifulsoup4"
 
     normalized_site_context = normalize_site_context(site_context)
     if normalized_site_context and normalized_site_context.get("products"):
@@ -811,8 +858,8 @@ def handle_chart_from_balance_context():
     Used when user confirms they want to see the balance evolution chart.
     """
     try:
-        if os.path.exists('gl_sample_data.json'):
-            with open('gl_sample_data.json', 'r') as f:
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
+            with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:
                 gl_data = json.load(f)
             
             if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
@@ -897,7 +944,7 @@ def handle_balance_request(user_input):
     Handle balance inquiry requests dynamically by loading data and generating responses.
     Supports General Ledger balance queries and is extensible for future data types.
     """
-    global conversation_history
+    global conversation_history, balance_context
     normalized_input = user_input.lower()
     
     # Check for credit/debit chart requests
@@ -932,9 +979,9 @@ def handle_balance_request(user_input):
             is_credit_debit_request = True  # Treat as credit/debit request with type change
     
     if is_credit_debit_request:
-        if os.path.exists('gl_sample_data.json'):
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
             try:
-                with open('gl_sample_data.json', 'r') as f:
+                with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:
                     gl_data = json.load(f)
                 
                 if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
@@ -1029,9 +1076,9 @@ def handle_balance_request(user_input):
     
     # If user is requesting the chart directly, generate it
     if is_balance_chart_request:
-        if os.path.exists('gl_sample_data.json'):
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
             try:
-                with open('gl_sample_data.json', 'r') as f:
+                with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:
                     gl_data = json.load(f)
                 
                 if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
@@ -1114,9 +1161,40 @@ def handle_balance_request(user_input):
     
     # Handle General Ledger balance queries
     if is_gl_query or (not is_stock_query and is_balance_query):
-        if os.path.exists('gl_sample_data.json'):
+        # Try loading from company_data.json first (preferred)
+        company_data = load_company_data()
+        if company_data and 'general_ledger' in company_data:
+            gl_info = company_data['general_ledger']
+            balance = gl_info.get('current_balance', 0)
+            currency = gl_info.get('currency', 'USD')
+            last_updated = gl_info.get('last_transaction_date', company_data.get('last_updated', 'N/A'))
+            
+            # Format balance
+            if balance >= 1_000_000:
+                balance_str = f"{currency} {balance / 1_000_000:.1f} million"
+            else:
+                balance_str = f"{currency} {balance:,.2f}"
+            
+            response = (
+                f"The current General Ledger balance is {balance_str}. "
+                f"Last updated: {last_updated}. "
+                f"\\n\\n💡 Update company_data.json to refresh this data."
+            )
+            
+            # Set context for subsequent chart generation
+            balance_context = {
+                'data_source': 'company_data',
+                'balance': balance,
+                'currency': currency,
+                'last_updated': last_updated
+            }
+            
+            return response
+        
+        # Fallback to gl_sample_data.json if company_data.json not available
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
             try:
-                with open('gl_sample_data.json', 'r') as f:
+                with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:
                     gl_data = json.load(f)
                 
                 if 'samples' in gl_data and 'annual_trend' in gl_data['samples']:
@@ -1145,7 +1223,6 @@ def handle_balance_request(user_input):
                         )
                         
                         # Set context for subsequent chart generation
-                        global balance_context
                         balance_context = {
                             'data_source': 'general_ledger',
                             'balance': latest_balance,
@@ -1228,9 +1305,9 @@ def handle_graph_request(user_input):
         chart_type = 'histogram'
     
     # Check for general ledger data first (highest priority)
-    if os.path.exists('gl_sample_data.json'):
+    if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json')):
         try:
-            with open('gl_sample_data.json', 'r') as f:
+            with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'gl_sample_data.json'), 'r') as f:
                 gl_data = json.load(f)
             
             # Use the annual_trend data which has monthly/weekly breakdown
