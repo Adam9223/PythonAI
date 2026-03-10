@@ -949,6 +949,88 @@ def is_affirmation(user_input):
     return any(re.search(pattern, normalized, re.IGNORECASE) for pattern in affirmation_patterns)
 
 
+def handle_chart_request(user_input, auth_context=None):
+    """Fetch live chart/graph data from clone.ulap.biz stock card movement history."""
+    normalized_input = normalize_text(user_input)
+    chart_triggers = [
+        "chart",
+        "graph",
+        "movement",
+        "history", 
+        "trend",
+        "visualization",
+        "visual"
+    ]
+    
+    has_trigger = any(trigger in normalized_input for trigger in chart_triggers)
+    if not has_trigger:
+        return None
+    
+    if not SCRAPER_AVAILABLE:
+        return "Chart visualization requires web scraping. Please install: pip install requests beautifulsoup4"
+    
+    try:
+        # Load chart config from scraper_config.json
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "scraper_config.json")
+        chart_config = {}
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                full_config = json.load(f)
+                chart_config = full_config.get('chart_data', {})
+        
+        if not chart_config:
+            return "Chart data configuration not found in config/scraper_config.json"
+        
+        # Create scraper with chart config
+        resolved_auth_context = auth_context if isinstance(auth_context, dict) else None
+        scraper = get_company_scraper(auth_context=resolved_auth_context)
+        
+        # Override config for this request
+        scraper.config = chart_config
+        
+        # Fetch JSON data from graph endpoint
+        url = chart_config.get('url')
+        method = chart_config.get('api_method', 'POST')
+        graph_data = scraper.fetch_json_api(url, method=method)
+        
+        if "error" in graph_data:
+            return f"Failed to fetch chart data: {graph_data.get('error')}"
+        
+        # Format chart data for response
+        begin_qty = graph_data.get('begQty', 0)
+        end_qty = graph_data.get('endQty', 0)
+        items = graph_data.get('items', [])
+        
+        summary = f"Stock movement history:\n"
+        summary += f"- Beginning quantity: {begin_qty}\n"
+        summary += f"- Ending quantity: {end_qty}\n"
+        summary += f"- Total movements: {len(items)}\n"
+        
+        if items:
+            summary += f"\nRecent movements:\n"
+            for idx, item in enumerate(items[:5], 1):
+                yr_mo = item.get('YrMo', 'N/A')
+                run_bal = item.get('runBal', 'N/A')
+                qty_in = item.get('tIN', 0)
+                qty_out = item.get('tOUT', 0)
+                summary += f"{idx}. {yr_mo}: Balance {run_bal} (IN: {qty_in}, OUT: {qty_out})\n"
+            
+            if len(items) > 5:
+                summary += f"...and {len(items) - 5} more records"
+        
+        return {
+            'type': 'chart',
+            'chartType': 'line',
+            'summary': summary,
+            'data': graph_data,
+            'source': url
+        }
+    
+    except Exception as e:
+        print(f"Error fetching chart data: {e}")
+        return f"Error generating chart: {str(e)}"
+
+
 def handle_chart_from_balance_context():
     """
     Generate a General Ledger balance chart from GL sample data.

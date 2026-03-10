@@ -14,7 +14,7 @@ import secrets
 from datetime import datetime, timedelta
 import jwt
 
-from .main import respond, handle_balance_request, handle_inventory_request
+from .main import respond, handle_balance_request, handle_inventory_request, handle_chart_request
 
 # Security configuration
 SECRET_KEY = os.getenv("API_SECRET_KEY", "your-secret-key-change-in-production")
@@ -331,13 +331,26 @@ async def get_chart(
     api_key: str = Depends(verify_token)
 ):
     """
-    Generate a chart with specific type
+    Generate a chart with specific type or fetch live chart data
     
     Parameters:
     - chart_type: 'line', 'bar', or 'pie'
     - message: The context/request about the chart
     """
     try:
+        # Try to fetch live chart data first
+        chart_result = handle_chart_request(request.message, auth_context=None)
+        
+        if chart_result and isinstance(chart_result, dict) and chart_result.get('type') == 'chart':
+            # Got live chart data
+            return {
+                "success": True,
+                "chart_type": request.chart_type,
+                "data": chart_result,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        # Fallback: use AI to generate chart
         full_message = f"Show me {request.message} as a {request.chart_type} chart"
         response = respond(full_message)
         
