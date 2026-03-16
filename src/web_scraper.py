@@ -7,11 +7,102 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
+import base64
 from typing import Dict, List, Optional
 from urllib.parse import urljoin
 
 # Configuration file for storing website URLs and proxy settings
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "scraper_config.json")
+
+
+def _load_env_credentials() -> Dict[str, str]:
+    """Read site credentials from environment or .env file."""
+    creds = {
+        "username": os.environ.get("SITE_USERNAME", ""),
+        "password": os.environ.get("SITE_PASSWORD", ""),
+        "dev_id": os.environ.get("SITE_DEV_ID", ""),
+        "login_url": os.environ.get("SITE_LOGIN_URL", "https://clone.ulap.biz/api/login"),
+        "token_field": os.environ.get("SITE_TOKEN_FIELD", "token"),
+    }
+    # If any key is missing, also try reading .env directly
+    if not creds["username"] or not creds["password"]:
+        env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+        if os.path.exists(env_path):
+            try:
+                with open(env_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        key, _, value = line.partition("=")
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        mapping = {
+                            "SITE_USERNAME": "username",
+                            "SITE_PASSWORD": "password",
+                            "SITE_DEV_ID": "dev_id",
+                            "SITE_LOGIN_URL": "login_url",
+                            "SITE_TOKEN_FIELD": "token_field",
+                        }
+                        if key in mapping:
+                            creds[mapping[key]] = value
+            except Exception:
+                pass
+    return creds
+
+
+def _persist_token_to_config(token: str):
+    """Write a new token into every api_fixed_auth_token entry in scraper_config.json."""
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            config = json.load(f)
+        for section in config.values():
+            if isinstance(section, dict) and "api_fixed_auth_token" in section:
+                section["api_fixed_auth_token"] = token
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        print(f"[WebScraper] Failed to persist token to config: {e}")
+
+
+def _perform_auto_login() -> Optional[str]:
+    """
+    Attempt to re-login to the target site using credentials from .env.
+    Returns the new token on success, or None if credentials are not available.
+    """
+    creds = _load_env_credentials()
+    if not creds["username"] or not creds["password"]:
+        return None
+
+    try:
+        credentials = base64.b64encode(
+            f"{creds['username']}:{creds['password']}".encode()
+        ).decode()
+        headers = {
+            "Authorization": f"Basic {credentials}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        if creds["dev_id"]:
+            headers["Cookie"] = f"devID={creds['dev_id']}"
+
+        resp = requests.get(creds["login_url"], headers=headers, timeout=10, verify=True)
+        resp.raise_for_status()
+        data = resp.json()
+
+        token = (
+            data.get(creds["token_field"])
+            or data.get("token")
+            or data.get("access_token")
+            or (data.get("data") or {}).get("token")
+        )
+        if token:
+            _persist_token_to_config(token)
+            print("[WebScraper] Auto-login successful. Token refreshed.")
+        return token
+    except Exception as e:
+        print(f"[WebScraper] Auto-login failed: {e}")
+        return None
 
 
 class WebScraper:
@@ -171,6 +262,16 @@ class WebScraper:
                 request_kwargs["json"] = payload
 
             response = self.session.request(request_method, **request_kwargs)
+
+            # On 401 (token expired/invalid), try to re-login automatically and retry once
+            if response.status_code == 401:
+                new_token = _perform_auto_login()
+                if new_token:
+                    auth_header = self.config.get("api_fixed_auth_header", "x-access-tokens")
+                    self.headers[auth_header] = new_token
+                    self.auth_token = new_token
+                    request_kwargs["headers"] = self.headers
+                    response = self.session.request(request_method, **request_kwargs)
 
             if response.status_code >= 400:
                 body_preview = (response.text or "")[:500]
@@ -397,6 +498,150 @@ class WebScraper:
             "products": deduped,
             "total_products": len(deduped),
             "attempted_urls": attempted_urls
+        }
+
+    def fetch_all_products_with_stock(self) -> Dict:
+        """
+        Fetch ALL products from product catalog.
+        
+        Uses `/api/lib/prod` and returns normalized product records.
+        Quantity comes from catalog field `qtySC`.
+        """
+        config = self.load_config()
+        products_config = config.get("products_list", {})
+        
+        if not products_config:
+            return {"error": "Missing products_list config"}
+        
+        # Get all products first
+        products_url = products_config.get("url")
+        products_result = self.fetch_json_api(
+            products_url,
+            method=products_config.get("api_method", "POST")
+        )
+        
+        if "error" in products_result:
+            return {"error": f"Failed to fetch products list: {products_result.get('error')}"}
+        
+        # Extract product list
+        products_list = products_result.get("items", [])
+        if not products_list:
+            return {"error": "No products found in catalog"}
+        
+        # Build consolidated inventory from catalog
+        inventory_data = []
+        for idx, product in enumerate(products_list[:50]):  # Support up to 50 products
+            if not isinstance(product, dict):
+                continue
+            
+            ixProd = product.get("ixProd")
+            prod_name = product.get("sProd", "Unknown")
+            prod_code = product.get("ProdCd", "")
+            category = product.get("sProdCat", "")
+            
+            if not ixProd:
+                continue
+            
+            # Quantity from product list (qtySC)
+            qty = product.get("qtySC", 0)
+            
+            inventory_data.append({
+                "product_id": ixProd,
+                "product_code": prod_code,
+                "product_name": prod_name,
+                "category": category,
+                "quantity": qty
+            })
+        
+        return {
+            "products": inventory_data,
+            "total_products": len(inventory_data),
+            "source_url": products_url,
+            "data_type": "aggregated_stock_card"
+        }
+
+    def fetch_product_balance(self, product_id: int, warehouse_id: Optional[int] = None) -> Dict:
+        """Fetch live stock-card balance for one product id."""
+        config = self.load_config()
+        stock_config = config.get("company_website", {})
+
+        stock_url = stock_config.get("url")
+        if not stock_url:
+            return {"error": "Missing company_website.url config"}
+
+        default_body = stock_config.get("api_default_body", {})
+        payload = {
+            "ixProd": int(product_id),
+            "dt1": default_body.get("dt1", "2026-03-01T00:00:00+08:00"),
+            "dt2": default_body.get("dt2", "2026-03-31T23:59:59+08:00"),
+            "ixWH": default_body.get("ixWH", 0) if warehouse_id is None else int(warehouse_id),
+            "SN": default_body.get("SN", ""),
+            "SN2": default_body.get("SN2", ""),
+        }
+
+        result = self.fetch_json_api(stock_url, method=stock_config.get("api_method", "POST"), payload=payload)
+        if "error" in result:
+            return result
+
+        return {
+            "product_id": int(product_id),
+            "balance": result.get("endQty", 0),
+            "begin_qty": result.get("begQty", 0),
+            "raw": result,
+        }
+
+    def fetch_general_ledger_accounts(self) -> Dict:
+        """Fetch General Ledger accounts via configured /api/lib/acc endpoint."""
+        config = self.load_config()
+        gl_config = config.get("general_ledger_accounts", {})
+
+        if not gl_config:
+            return {"error": "Missing general_ledger_accounts config"}
+
+        gl_url = gl_config.get("url")
+        if not gl_url:
+            return {"error": "Missing general_ledger_accounts.url config"}
+
+        # Build a scoped scraper instance so section-specific headers/body are applied.
+        cookie_jar = self.session.cookies.get_dict() if self.session else {}
+        gl_auth_header = gl_config.get("api_fixed_auth_header", "Authorization")
+        gl_scraper = WebScraper(
+            proxy=self.proxy,
+            auth_token=self.auth_token,
+            auth_header_name=gl_auth_header,
+            cookies=cookie_jar,
+            config=gl_config,
+        )
+
+        result = gl_scraper.fetch_json_api(
+            gl_url,
+            method=gl_config.get("api_method", "POST"),
+            payload=gl_config.get("api_default_body", {}),
+        )
+        if "error" in result:
+            return result
+
+        if isinstance(result, list):
+            records = result
+        elif isinstance(result, dict):
+            records = (
+                result.get("items")
+                or result.get("data")
+                or result.get("rep")
+                or result.get("rows")
+                or []
+            )
+            if not isinstance(records, list):
+                records = [result]
+        else:
+            records = []
+
+        return {
+            "accounts": records,
+            "total_accounts": len(records),
+            "source_url": gl_url,
+            "data_type": "general_ledger_accounts",
+            "raw": result,
         }
 
     def _extract_products_from_tables(self, tables: List[List[str]]) -> List[str]:

@@ -311,6 +311,55 @@ curl "http://localhost:8000/api/inventory?search_term=widgets" \
 
 ---
 
+### 6. General Ledger Accounts Endpoint
+
+Fetch General Ledger account library data from the upstream source (`POST /api/lib/acc`).
+
+```
+POST /api/general-ledger/accounts
+Authorization: Bearer YOUR_TOKEN
+Content-Type: application/json
+```
+
+**Request Body (all fields optional):**
+
+- `user_auth_token` (string): Site token override. If omitted, server uses stored site token.
+- `user_cookie` (string): Raw cookie header, for example `devID=6515450`.
+- `auth_header_name` (string): Defaults to `x-access-tokens`.
+- `extra_headers` (object): Any additional upstream headers.
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8000/api/general-ledger/accounts" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_auth_token": "YOUR_SITE_TOKEN",
+    "user_cookie": "devID=6515450",
+    "auth_header_name": "x-access-tokens"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data_source": "general_ledger_accounts",
+  "data": {
+    "accounts": [],
+    "total_accounts": 0,
+    "source_url": "https://clone.ulap.biz/api/lib/acc",
+    "data_type": "general_ledger_accounts",
+    "raw": {}
+  },
+  "timestamp": "2026-03-12T10:00:00.000000"
+}
+```
+
+---
+
 ## Error Responses
 
 ### 401 Unauthorized

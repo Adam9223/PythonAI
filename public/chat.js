@@ -5,6 +5,84 @@ const sendBtn = document.getElementById("sendBtn");
 const status = document.getElementById("status");
 const chatForm = document.getElementById("chatForm");
 
+// ── Connect-Account panel ──────────────────────────────────────────────────
+const connectBtn = document.getElementById("connectBtn");
+const connectPanel = document.getElementById("connectPanel");
+const connectForm = document.getElementById("connectForm");
+const connectStatus = document.getElementById("connectStatus");
+const connectSubmitBtn = document.getElementById("connectSubmitBtn");
+const connectCancelBtn = document.getElementById("connectCancelBtn");
+
+// Reflect saved connection state from localStorage
+function refreshConnectBtnLabel() {
+  const connected = localStorage.getItem("siteConnected") === "true";
+  if (connected) {
+    connectBtn.textContent = "✅ Connected";
+    connectBtn.classList.add("connected");
+  } else {
+    connectBtn.textContent = "🔗 Connect Account";
+    connectBtn.classList.remove("connected");
+  }
+}
+
+function openConnectPanel() {
+  connectPanel.classList.remove("hidden");
+  connectPanel.classList.add("visible");
+  connectStatus.textContent = "";
+  connectStatus.className = "connect-status";
+}
+
+function closeConnectPanel() {
+  connectPanel.classList.remove("visible");
+  connectPanel.classList.add("hidden");
+}
+
+connectBtn.addEventListener("click", () => {
+  const isOpen = connectPanel.classList.contains("visible");
+  isOpen ? closeConnectPanel() : openConnectPanel();
+});
+
+connectCancelBtn.addEventListener("click", closeConnectPanel);
+
+connectForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = document.getElementById("siteUsername").value.trim();
+  const password = document.getElementById("sitePassword").value;
+  if (!username || !password) return;
+
+  connectSubmitBtn.disabled = true;
+  connectStatus.textContent = "Connecting…";
+  connectStatus.className = "connect-status";
+
+  try {
+    const res = await fetch("/api/auth/site-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      localStorage.setItem("siteConnected", "true");
+      refreshConnectBtnLabel();
+      connectStatus.textContent =
+        "✅ Connected! The AI can now access live data.";
+      connectStatus.className = "connect-status success";
+      setTimeout(closeConnectPanel, 1800);
+    } else {
+      connectStatus.textContent = "❌ " + (data.error || "Login failed.");
+      connectStatus.className = "connect-status error";
+    }
+  } catch (err) {
+    connectStatus.textContent = "❌ Could not reach server.";
+    connectStatus.className = "connect-status error";
+  } finally {
+    connectSubmitBtn.disabled = false;
+  }
+});
+
+refreshConnectBtnLabel();
+// ──────────────────────────────────────────────────────────────────────────
+
 // Store chart instances for cleanup
 const chartInstances = new Map();
 let modalChartInstance = null;
@@ -54,8 +132,7 @@ function cloneChartData(data) {
     if (typeof structuredClone === "function") {
       return structuredClone(data);
     }
-  } catch (error) {
-  }
+  } catch (error) {}
 
   try {
     return JSON.parse(JSON.stringify(data));
@@ -66,7 +143,9 @@ function cloneChartData(data) {
 
 function sanitizeNumericDatasets(data) {
   const normalized = data && typeof data === "object" ? data : {};
-  const datasets = Array.isArray(normalized.datasets) ? normalized.datasets : [];
+  const datasets = Array.isArray(normalized.datasets)
+    ? normalized.datasets
+    : [];
 
   const cleanedDatasets = datasets.map((dataset) => {
     const values = Array.isArray(dataset.data) ? dataset.data : [];

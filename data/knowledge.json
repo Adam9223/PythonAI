@@ -31,6 +31,90 @@
     {
       "pattern": "Merlvin where do you live",
       "response": "Ground"
+    },
+    {
+      "pattern": "display check on hands may 2024",
+      "response": "To display the check on hands for May 2024, please navigate to the Inventory report and filter by date range May 1, 2024 – May 31, 2024. This will show all items on hand as of that period. If you need a live pull from the system, you can ask me to fetch the stock card data for that period and I will display the results."
+    },
+    {
+      "pattern": "check on hands may 2024",
+      "response": "To display the check on hands for May 2024, please navigate to the Inventory report and filter by date range May 1, 2024 – May 31, 2024. This will show all items on hand as of that period. If you need a live pull from the system, you can ask me to fetch the stock card data for that period and I will display the results."
+    },
+    {
+      "pattern": "provide me a product and list the top 5 you can recommend",
+      "response": "Based on your inventory and sales data, here are the top 5 recommended products to focus on:\n\n1. High-turnover items — Products with the fastest stock movement (low days-on-hand) generate consistent cash flow.\n2. High-margin products — Items with the greatest difference between cost and selling price maximize profit per unit sold.\n3. Best-sellers by volume — Products with the highest unit sales contribute most to revenue.\n4. Seasonal bestsellers — Products that spike during peak periods (holidays, promotions) should be stocked in advance.\n5. Low-stock, high-demand items — Products currently below reorder point but with strong sales history to avoid stockouts.\n\nTo get a specific ranked list from your live data, ask me to fetch the stock card or inventory report and I can analyze actual movement figures."
+    },
+    {
+      "pattern": "top 5 products you can recommend",
+      "response": "Based on your inventory and sales data, here are the top 5 recommended products to focus on:\n\n1. High-turnover items — Products with the fastest stock movement (low days-on-hand) generate consistent cash flow.\n2. High-margin products — Items with the greatest difference between cost and selling price maximize profit per unit sold.\n3. Best-sellers by volume — Products with the highest unit sales contribute most to revenue.\n4. Seasonal bestsellers — Products that spike during peak periods (holidays, promotions) should be stocked in advance.\n5. Low-stock, high-demand items — Products currently below reorder point but with strong sales history to avoid stockouts.\n\nTo get a specific ranked list from your live data, ask me to fetch the stock card or inventory report and I can analyze actual movement figures."
+    },
+    {
+      "pattern": "display the list of customers with debt",
+      "response": "To display the list of customers with outstanding debt, please go to the Accounts Receivable module and run an Aging Report. This will show all customers with unpaid balances, grouped by how long the debt has been outstanding (e.g., 0–30 days, 31–60 days, 61–90 days, 90+ days). In the system, Accounts Receivable is tracked under account code 1-010. If you would like me to pull this data from the live system, please ask and I can fetch the current receivables list."
+    },
+    {
+      "pattern": "list of customers with debt",
+      "response": "To display the list of customers with outstanding debt, please go to the Accounts Receivable module and run an Aging Report. This will show all customers with unpaid balances, grouped by how long the debt has been outstanding (e.g., 0–30 days, 31–60 days, 61–90 days, 90+ days). In the system, Accounts Receivable is tracked under account code 1-010. If you would like me to pull this data from the live system, please ask and I can fetch the current receivables list."
+    },
+    {
+      "pattern": "how many accounts receivable the system can handle",
+      "response": "The system does not have a hard limit on the number of accounts receivable records it can handle. It is designed to accommodate an unlimited number of customer receivable entries, constrained only by server storage and database capacity. Each receivable is tracked under account code 1-010 (Accounts Receivable) in the Chart of Accounts. For practical performance, regular archiving of fully-collected or written-off receivables is recommended."
+    },
+    {
+      "pattern": "accounts receivable system capacity",
+      "response": "The system does not have a hard limit on the number of accounts receivable records it can handle. It is designed to accommodate an unlimited number of customer receivable entries, constrained only by server storage and database capacity. Each receivable is tracked under account code 1-010 (Accounts Receivable) in the Chart of Accounts."
+    },
+    {
+      "pattern": "how many write-offs are processed in the system",
+      "response": "The system can process an unlimited number of write-offs. A write-off is recorded by debiting a Bad Debt Expense account and crediting Accounts Receivable (account 1-010), effectively removing the uncollectible balance from the books. The number of write-offs processed depends entirely on the volume of uncollectible receivables identified by management. There is no system-imposed cap on write-off transactions."
+    },
+    {
+      "pattern": "write-offs processed in the system",
+      "response": "The system can process an unlimited number of write-offs. A write-off is recorded by debiting a Bad Debt Expense account and crediting Accounts Receivable (account 1-010), effectively removing the uncollectible balance from the books. There is no system-imposed cap on write-off transactions."
+    },
+    {
+      "pattern": "what's the policy for bad debts",
+      "response": "The standard policy for bad debts in the system is as follows:\n\n1. Identification — Receivables that remain uncollected beyond 90–120 days are flagged for review.\n2. Allowance Method — An Allowance for Doubtful Accounts is maintained to estimate expected uncollectible amounts at period-end, charged against income.\n3. Direct Write-Off — When a specific receivable is confirmed uncollectible, it is written off by debiting Bad Debt Expense and crediting Accounts Receivable (1-010).\n4. Recovery — If a previously written-off amount is subsequently collected, the entry is reversed and the cash receipt is recorded.\n5. Review Frequency — Bad debt estimates are reviewed at each month-end and adjusted accordingly.\n\nThe specific thresholds and percentages used should be set by management and documented in the company's accounting policy manual."
+    },
+    {
+      "pattern": "bad debt policy",
+      "response": "The standard policy for bad debts in the system is:\n\n1. Receivables unpaid beyond 90–120 days are flagged for review.\n2. An Allowance for Doubtful Accounts is maintained for end-of-period estimates.\n3. Confirmed uncollectibles are written off: Debit Bad Debt Expense, Credit Accounts Receivable (1-010).\n4. Recovered write-offs are reversed and the cash receipt recorded.\n5. Bad debt estimates are reviewed every month-end."
+    },
+    {
+      "pattern": "how to record chart of accounts",
+      "response": "To record (set up) a Chart of Accounts in the system:\n\n1. Go to the Accounting or General Ledger module and open the Chart of Accounts section.\n2. Click 'Add New Account'.\n3. Enter the Account Number (e.g., 1-001), Account Name (e.g., Cash), Account Type (Asset, Liability, Equity, Revenue, Expense, or Other), and the Financial Statement it belongs to (Balance Sheet or Income Statement).\n4. Save the entry.\n\nThe system uses the following numbering convention based on the Chart of Accounts:\n• 1-xxx — Assets (Balance Sheet)\n• 2-xxx — Liabilities (Balance Sheet)\n• 3-xxx — Equity (Balance Sheet)\n• 4-xxx — Revenue (Income Statement)\n• 5-xxx — Expenses (Income Statement)\n• 6-xxx — Other (Income Statement)\n\nExample entries: 1-001 Cash, 1-010 Accounts Receivable, 2-001 Accounts Payable, 4-001 Revenue."
+    },
+    {
+      "pattern": "record chart of accounts",
+      "response": "To record (set up) a Chart of Accounts in the system:\n\n1. Go to the Accounting or General Ledger module and open the Chart of Accounts section.\n2. Click 'Add New Account'.\n3. Enter the Account Number, Account Name, Account Type, and Financial Statement.\n4. Save the entry.\n\nNumbering convention:\n• 1-xxx — Assets | 2-xxx — Liabilities | 3-xxx — Equity | 4-xxx — Revenue | 5-xxx — Expenses | 6-xxx — Other"
+    },
+    {
+      "pattern": "chart of accounts",
+      "response": "The Chart of Accounts defines every account used in the general ledger. Here is the full list:\n\nASSETS (Balance Sheet):\n• 1-001 — Cash\n• 1-010 — Accounts Receivable\n• 1-020 — Prepaid Expenses\n• 1-030 — Inventory\n• 1-040 — Fixed Assets\n• 1-050 — Accumulated Depreciation\n• 1-060 — Other Assets\n\nLIABILITIES (Balance Sheet):\n• 2-001 — Accounts Payable\n• 2-010 — Accrued Liabilities\n• 2-020 — Taxes Payable\n• 2-030 — Payroll Payable\n• 2-040 — Notes Payable\n\nEQUITY (Balance Sheet):\n• 3-001 — Common Stock\n• 3-010 — Retained Earnings\n• 3-020 — Additional Paid in Capital\n\nREVENUE (Income Statement):\n• 4-001 — Revenue\n• 4-010 — Sales Returns and Allowances\n\nEXPENSES (Income Statement):\n• 5-001 — Cost of Goods Sold\n• 5-010 — Advertising Expense\n• 5-020 — Bank Fees\n• 5-030 — Depreciation Expense\n• 5-040 — Payroll Tax Expense\n• 5-050 — Rent Expense\n• 5-060 — Supplies Expense\n• 5-070 — Utilities Expense\n• 5-080 — Wages Expense\n\nOTHER (Income Statement):\n• 6-001 — Other Expenses"
+    },
+    {
+      "pattern": "what's the code for cash in bank",
+      "response": "Based on the Chart of Accounts, the code for Cash is 1-001. It is classified as an Asset and appears on the Balance Sheet. If your system separates 'Cash on Hand' from 'Cash in Bank', Cash in Bank would typically be a sub-account under the 1-001 series (e.g., 1-001-01 for Cash in Bank). Refer to account 1-001 in the Chart of Accounts."
+    },
+    {
+      "pattern": "code for cash in bank",
+      "response": "The account code for Cash (including Cash in Bank) is 1-001 according to the Chart of Accounts. It is an Asset account on the Balance Sheet."
+    },
+    {
+      "pattern": "what is the account code for cash",
+      "response": "The account code for Cash is 1-001. It is classified as an Asset on the Balance Sheet per the Chart of Accounts."
+    },
+    {
+      "pattern": "does the system require balance for property plant and equipment",
+      "response": "Property, Plant and Equipment (PP&E) is recorded under Fixed Assets, account code 1-040 in the Chart of Accounts (Asset, Balance Sheet). The system requires a balance for Fixed Assets when items of PP&E have been acquired and have not been fully depreciated or disposed of. Accumulated depreciation is tracked separately under account 1-050 (Accumulated Depreciation). The net book value of PP&E equals: Fixed Assets (1-040) minus Accumulated Depreciation (1-050). A balance is required whenever the company holds depreciable assets."
+    },
+    {
+      "pattern": "property plant and equipment balance",
+      "response": "PP&E (Property, Plant and Equipment) is tracked under account 1-040 (Fixed Assets) on the Balance Sheet. Accumulated depreciation is recorded in account 1-050. The net book value = Fixed Assets (1-040) − Accumulated Depreciation (1-050). A balance is required whenever the company holds depreciable assets."
+    },
+    {
+      "pattern": "fixed assets account code",
+      "response": "Fixed Assets are recorded under account code 1-040 (Asset, Balance Sheet). Accumulated Depreciation is tracked under account code 1-050 (Asset, Balance Sheet)."
     }
   ]
 }

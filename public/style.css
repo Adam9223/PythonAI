@@ -39,6 +39,7 @@ body {
   padding: 20px;
   text-align: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .header h1 {
@@ -49,6 +50,135 @@ body {
 .header .subtitle {
   font-size: 12px;
   opacity: 0.9;
+}
+
+/* Connect button */
+.connect-btn {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.connect-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.connect-btn.connected {
+  background: rgba(39, 174, 96, 0.7);
+  border-color: rgba(39, 174, 96, 0.9);
+}
+
+/* Connect panel */
+.connect-panel {
+  background: #fff8f0;
+  border-bottom: 1px solid #ffd9a0;
+  padding: 0;
+  overflow: hidden;
+  max-height: 0;
+  transition:
+    max-height 0.3s ease,
+    padding 0.3s ease;
+}
+
+.connect-panel.visible {
+  max-height: 260px;
+  padding: 16px;
+}
+
+.connect-panel.hidden {
+  max-height: 0;
+  padding: 0 16px;
+}
+
+.connect-panel-inner {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.connect-panel-inner strong {
+  font-size: 14px;
+  display: block;
+  margin-bottom: 4px;
+  color: #c0392b;
+}
+
+.connect-hint {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+#connectForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#connectForm input {
+  padding: 8px 12px;
+  border: 1px solid #e0c8a0;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+#connectForm input:focus {
+  border-color: #ff8c00;
+}
+
+.connect-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#connectSubmitBtn {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+#connectSubmitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#connectCancelBtn {
+  padding: 8px 14px;
+  background: #eee;
+  color: #555;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.connect-status {
+  font-size: 12px;
+  margin-top: 6px;
+  min-height: 18px;
+}
+
+.connect-status.success {
+  color: #27ae60;
+}
+
+.connect-status.error {
+  color: #e74c3c;
 }
 
 /* Chat Messages */

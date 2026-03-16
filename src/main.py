@@ -4,19 +4,19 @@ import re
 import sys
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 
 # Import new modules for web scraping and graph generation
 try:
-    from .web_scraper import WebScraper
+    from .web_scraper import WebScraper, _perform_auto_login as _scraper_auto_login
     from .graph_generator import GraphGenerator
     SCRAPER_AVAILABLE = True
     GRAPH_AVAILABLE = True
 except ImportError:
     # Fallback for direct script execution
     try:
-        from web_scraper import WebScraper
+        from web_scraper import WebScraper, _perform_auto_login as _scraper_auto_login
         from graph_generator import GraphGenerator
         SCRAPER_AVAILABLE = True
         GRAPH_AVAILABLE = True
@@ -24,6 +24,25 @@ except ImportError:
         print(f"Warning: Some features unavailable - {e}")
         SCRAPER_AVAILABLE = False
         GRAPH_AVAILABLE = False
+        _scraper_auto_login = None
+
+# Attempt a proactive token refresh on startup so we don't hit 401 on the first request
+if SCRAPER_AVAILABLE and _scraper_auto_login is not None:
+    try:
+        _scraper_auto_login()
+    except Exception:
+        pass
+
+# Ollama local LLM integration
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+OLLAMA_AVAILABLE = False
+_ollama_lib = None
+try:
+    import ollama as _ollama_lib
+    OLLAMA_AVAILABLE = True
+    print("Ollama AI engine loaded successfully")
+except ImportError:
+    print("Ollama not installed — using rule-based fallback. Run: pip install ollama")
 
 FILE_NAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "knowledge.json")
 ARTICLES_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "articles_db.json")
@@ -233,6 +252,130 @@ def tokenize(text):
     normalized = normalize_text(text)
     tokens = [word for word in normalized.split() if word not in stop_words]
     return tokens
+
+
+def parse_chart_date_range(user_input, default_dt1=None, default_dt2=None):
+    """Parse date range phrases for chart queries.
+
+    Supports examples:
+    - from Jan to Mar 2026
+    - from January 2026 to March 2026
+    - from 2026-01-01 to 2026-03-31
+    - last 30 days / last 12 weeks / last 6 months
+    """
+    text = user_input.lower()
+    now = datetime.now()
+
+    def fmt_start(dt):
+        return dt.strftime("%Y-%m-%dT00:00:00+08:00")
+
+    def fmt_end(dt):
+        return dt.strftime("%Y-%m-%dT23:59:59+08:00")
+
+    # 0) Common calendar phrases
+    if "this month" in text:
+        start = datetime(now.year, now.month, 1)
+        return fmt_start(start), fmt_end(now)
+
+    if "last month" in text:
+        if now.month == 1:
+            y, m = now.year - 1, 12
+        else:
+            y, m = now.year, now.month - 1
+        start = datetime(y, m, 1)
+        if m == 12:
+            next_month = datetime(y + 1, 1, 1)
+        else:
+            next_month = datetime(y, m + 1, 1)
+        end = next_month - timedelta(days=1)
+        return fmt_start(start), fmt_end(end)
+
+    if "this year" in text:
+        start = datetime(now.year, 1, 1)
+        return fmt_start(start), fmt_end(now)
+
+    if "last year" in text:
+        start = datetime(now.year - 1, 1, 1)
+        end = datetime(now.year - 1, 12, 31)
+        return fmt_start(start), fmt_end(end)
+
+    # Quarter pattern: Q1 2026 or quarter 1 2026
+    q_match = re.search(r"(?:q|quarter\s*)([1-4])\s*(\d{4})", text)
+    if q_match:
+        quarter = int(q_match.group(1))
+        year = int(q_match.group(2))
+        start_month = 1 + (quarter - 1) * 3
+        end_month = start_month + 2
+        start = datetime(year, start_month, 1)
+        if end_month == 12:
+            next_month = datetime(year + 1, 1, 1)
+        else:
+            next_month = datetime(year, end_month + 1, 1)
+        end = next_month - timedelta(days=1)
+        return fmt_start(start), fmt_end(end)
+
+    # 1) Relative ranges: last N days|weeks|months
+    rel = re.search(r"last\s+(\d{1,3})\s+(day|days|week|weeks|month|months)", text)
+    if rel:
+        amount = int(rel.group(1))
+        unit = rel.group(2)
+        if "day" in unit:
+            start = now - timedelta(days=amount)
+        elif "week" in unit:
+            start = now - timedelta(weeks=amount)
+        else:
+            start = now - timedelta(days=amount * 30)
+        return fmt_start(start), fmt_end(now)
+
+    # 2) Explicit ISO date range: from YYYY-MM-DD to YYYY-MM-DD
+    iso = re.search(r"(?:from|between)\s+(\d{4}-\d{2}-\d{2})\s+(?:to|and)\s+(\d{4}-\d{2}-\d{2})", text)
+    if iso:
+        try:
+            start = datetime.strptime(iso.group(1), "%Y-%m-%d")
+            end = datetime.strptime(iso.group(2), "%Y-%m-%d")
+            return fmt_start(start), fmt_end(end)
+        except ValueError:
+            pass
+
+    # 3) Month-name range: from Jan to Mar 2026 / from January 2026 to March 2026
+    months = {
+        "jan": 1, "january": 1,
+        "feb": 2, "february": 2,
+        "mar": 3, "march": 3,
+        "apr": 4, "april": 4,
+        "may": 5,
+        "jun": 6, "june": 6,
+        "jul": 7, "july": 7,
+        "aug": 8, "august": 8,
+        "sep": 9, "sept": 9, "september": 9,
+        "oct": 10, "october": 10,
+        "nov": 11, "november": 11,
+        "dec": 12, "december": 12,
+    }
+
+    mo = re.search(
+        r"(?:from|between)\s+([a-z]{3,9})(?:\s+(\d{4}))?\s+(?:to|and)\s+([a-z]{3,9})(?:\s+(\d{4}))?",
+        text
+    )
+    if mo:
+        m1_name, y1, m2_name, y2 = mo.group(1), mo.group(2), mo.group(3), mo.group(4)
+        if m1_name in months and m2_name in months:
+            month1 = months[m1_name]
+            month2 = months[m2_name]
+            year2 = int(y2) if y2 else int(y1) if y1 else now.year
+            year1 = int(y1) if y1 else year2
+
+            start = datetime(year1, month1, 1)
+            # End = last day of end month
+            if month2 == 12:
+                next_month = datetime(year2 + 1, 1, 1)
+            else:
+                next_month = datetime(year2, month2 + 1, 1)
+            end = next_month - timedelta(days=1)
+            return fmt_start(start), fmt_end(end)
+
+    # Fallback to defaults
+    return default_dt1, default_dt2
 
 
 def token_similarity(text1, text2):
@@ -625,19 +768,27 @@ def get_live_gl_data(force_refresh=False):
     global live_site_cache, live_site_cache_timestamp
     
     try:
-        # Try to get live site data
+        # Primary source: configured GL accounts API (/api/lib/acc).
+        if SCRAPER_AVAILABLE:
+            scraper = get_company_scraper()
+            gl_accounts = scraper.fetch_general_ledger_accounts()
+            if "error" not in gl_accounts:
+                return {
+                    'source': 'live_gl_accounts_api',
+                    'data': gl_accounts,
+                    'timestamp': datetime.now().isoformat()
+                }
+
+        # Secondary source: generic company website scraping cache.
         live_data = get_live_company_data(force_refresh)
-        
-        # If we have GL-related fields in the live data, use them
         if live_data and "error" not in live_data:
-            # Check for GL data in scraped content
             if "financial" in live_data or "ledger" in live_data or "balance" in live_data:
                 return {
                     'source': 'live_website',
                     'data': live_data,
                     'timestamp': datetime.now().isoformat()
                 }
-        
+
     except Exception as e:
         print(f"Error fetching live GL data: {e}")
     
@@ -795,9 +946,56 @@ def load_company_data():
     return None
 
 
+def handle_branches_request(user_input):
+    """
+    Handle branch/warehouse/location inquiry requests.
+    Returns a signal for the API to fetch branches data.
+    """
+    normalized_input = normalize_text(user_input)
+    
+    branch_triggers = [
+        "branch",
+        "branches",
+        "warehouse",
+        "warehouses",
+        "location",
+        "locations",
+        "site",
+        "sites",
+        "facility",
+        "facilities"
+    ]
+    
+    query_intent = [
+        "what",
+        "which",
+        "list",
+        "show",
+        "available",
+        "do we have",
+        "we have"
+    ]
+    
+    has_trigger = any(trigger in normalized_input for trigger in branch_triggers)
+    has_intent = any(intent in normalized_input for intent in query_intent)
+    
+    if has_trigger and has_intent:
+        # Return a signal for the FastAPI endpoint to fetch branches
+        return {
+            "type": "branches_request",
+            "message": "Fetching available branches..."
+        }
+    
+    return None
+
+
 def handle_inventory_request(user_input, site_context=None, auth_token=None, auth_context=None):
     """Handle inventory/product lookup requests from stock card (SC) or inventory pages."""
     normalized_input = normalize_text(user_input)
+
+    # Let chart handler process chart/graph requests first
+    if any(word in normalized_input for word in ["chart", "graph", "historical", "trend", "visual"]):
+        return None
     inventory_triggers = [
         "inventory",
         "stock card",
@@ -809,11 +1007,41 @@ def handle_inventory_request(user_input, site_context=None, auth_token=None, aut
     ]
 
     # Require at least one trigger and at least one intent/action word
-    intent_words = ["what", "list", "show", "get", "current", "available"]
+    intent_words = ["what", "list", "show", "get", "current", "available", "find", "give"]
     has_trigger = any(trigger in normalized_input for trigger in inventory_triggers)
     has_intent = any(word in normalized_input for word in intent_words)
 
-    if not (has_trigger and has_intent):
+    # Product-specific queries (even without explicit inventory trigger)
+    product_lookup_markers = ["product", "units", "balance", "stock", "click", "beat", "item"]
+    has_product_lookup = any(marker in normalized_input for marker in product_lookup_markers)
+
+    # Distinguish between broad list requests vs specific product lookup requests.
+    is_collection_request = (
+        ("products in inventory" in normalized_input)
+        or ("items in inventory" in normalized_input)
+        or ("what are the products" in normalized_input)
+        or bool(re.search(r"what\s+products?\s+(are\s+)?in\s+(the\s+)?inventory", normalized_input))
+        or ("list products" in normalized_input)
+        or ("show products" in normalized_input)
+        or ("show all products" in normalized_input)
+        or ("current products" in normalized_input)
+    )
+
+    specific_product_markers = [
+        "balance",
+        "find",
+        "code",
+        "sku",
+        "exact",
+        "named",
+        "for",
+    ]
+    has_specific_product_marker = any(marker in normalized_input for marker in specific_product_markers)
+
+    # If user asks for a specific item lookup/balance, enable match-scoring path.
+    should_handle_product_query = has_product_lookup and has_specific_product_marker and not is_collection_request
+
+    if not ((has_trigger and has_intent) or should_handle_product_query):
         return None
     
     # Try web scraping first (primary data source)
@@ -863,76 +1091,234 @@ def handle_inventory_request(user_input, site_context=None, auth_token=None, aut
 
     resolved_auth_context = auth_context if isinstance(auth_context, dict) else auth_token
     scraper = get_company_scraper(auth_context=resolved_auth_context)
-    result = scraper.scrape_inventory("company_website")
 
-    if "error" in result:
-        upstream_error = result.get("error", "Unknown scraping error")
-        upstream_status = result.get("status_code")
-        upstream_method = result.get("method")
-        upstream_url = result.get("url") or result.get("source_url")
-        upstream_text = result.get("response_text", "")
+    # 1) Preferred path: aggregate all products from /api/lib/prod
+    result_multi = scraper.fetch_all_products_with_stock()
+    if "error" not in result_multi:
+        products = result_multi.get("products", [])
+        total = len(products)
+        source_url = result_multi.get("source_url", "clone.ulap.biz")
 
-        diagnostics = ""
-        if upstream_url:
-            diagnostics += f"\nUpstream URL: {upstream_url}"
-        if upstream_method:
-            diagnostics += f"\nMethod: {upstream_method}"
-        if upstream_status is not None:
-            diagnostics += f"\nStatus: {upstream_status}"
-        if upstream_error:
-            diagnostics += f"\nError: {upstream_error}"
-        if upstream_text:
-            diagnostics += f"\nResponse: {upstream_text[:220]}"
+        # Inventory management analytics intents
+        ask_low_stock = any(term in normalized_input for term in ["low stock", "critical stock", "reorder"])
+        ask_out_of_stock = any(term in normalized_input for term in ["out of stock", "no stock", "zero stock"])
+        ask_top_stock = (
+            any(term in normalized_input for term in ["top stock", "highest stock", "most stock", "top products"])
+            or bool(re.search(r"\btop\s+\d+\s+products?\b", normalized_input))
+            or bool(re.search(r"\btop\s+products?\b", normalized_input))
+        )
+        ask_summary = any(term in normalized_input for term in ["summary", "overview", "kpi", "status"])
 
-        # Fallback to company_data.json if web scraping fails
-        company_data = load_company_data()
-        if company_data and 'inventory' in company_data:
-            inventory_items = company_data['inventory']
-            total = len(inventory_items)
-            company_name = company_data.get('company_name', 'Company Data')
-            last_updated = company_data.get('last_updated', 'N/A')
-            
-            lines = []
-            for idx, item in enumerate(inventory_items[:20], 1):
-                product = item.get('product_name', 'Unknown')
-                qty = item.get('quantity', 0)
-                unit = item.get('unit', 'units')
-                location = item.get('location', 'N/A')
-                status = item.get('status', '')
-                lines.append(f"{idx}. {product}: {qty} {unit} @ {location} [{status}]")
-            
-            more_note = f"\n...and {total - 20} more items." if total > 20 else ""
-            
+        if products and (ask_low_stock or ask_out_of_stock or ask_top_stock or ask_summary):
+            normalized_products = []
+            for item in products:
+                qty = item.get("quantity", 0)
+                try:
+                    qty = float(qty)
+                except (TypeError, ValueError):
+                    qty = 0.0
+                normalized_products.append({**item, "quantity": qty})
+
+            in_stock = [p for p in normalized_products if p["quantity"] > 0]
+            out_stock = [p for p in normalized_products if p["quantity"] <= 0]
+            low_stock = [p for p in normalized_products if 0 < p["quantity"] <= 2]
+
+            if ask_out_of_stock:
+                preview = out_stock[:15]
+                lines = [
+                    f"{idx + 1}. {p.get('product_name', 'Unknown')} ({p.get('product_code', '')})"
+                    for idx, p in enumerate(preview)
+                ]
+                more = f"\n...and {len(out_stock) - len(preview)} more." if len(out_stock) > len(preview) else ""
+                return (
+                    f"Out-of-stock products (total: {len(out_stock)}):\n\n"
+                    + ("\n".join(lines) if lines else "No out-of-stock products found.")
+                    + more
+                )
+
+            if ask_low_stock:
+                preview = low_stock[:15]
+                lines = [
+                    f"{idx + 1}. {p.get('product_name', 'Unknown')} ({p.get('product_code', '')}) - {p.get('quantity', 0)} units"
+                    for idx, p in enumerate(preview)
+                ]
+                more = f"\n...and {len(low_stock) - len(preview)} more." if len(low_stock) > len(preview) else ""
+                return (
+                    f"Low-stock products (1-2 units, total: {len(low_stock)}):\n\n"
+                    + ("\n".join(lines) if lines else "No low-stock products found.")
+                    + more
+                )
+
+            if ask_top_stock:
+                top_match = re.search(r"top\s+(\d{1,2})", normalized_input)
+                top_n = int(top_match.group(1)) if top_match else 10
+                ranked = sorted(normalized_products, key=lambda x: x.get("quantity", 0), reverse=True)
+                preview = ranked[:max(1, min(top_n, 20))]
+                lines = [
+                    f"{idx + 1}. {p.get('product_name', 'Unknown')} ({p.get('product_code', '')}) - {p.get('quantity', 0)} units"
+                    for idx, p in enumerate(preview)
+                ]
+                return f"Top {len(preview)} products by stock:\n\n" + "\n".join(lines)
+
+            # summary
+            avg_stock = round(sum(p["quantity"] for p in normalized_products) / len(normalized_products), 2) if normalized_products else 0
             return (
-                f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
-                f"Total products: {total}\n\n"
-                + "\n".join(lines) + more_note +
-                "\n\n⚠️ Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json."
-                + (f"\n\nDiagnostics:{diagnostics}" if diagnostics else "")
+                "Inventory summary:\n"
+                f"- Total products: {len(normalized_products)}\n"
+                f"- In stock: {len(in_stock)}\n"
+                f"- Out of stock: {len(out_stock)}\n"
+                f"- Low stock (1-2 units): {len(low_stock)}\n"
+                f"- Average units/product: {avg_stock}"
             )
-        
-        attempted = result.get("attempted_urls", [])
-        attempted_preview = "\n".join([f"- {url}" for url in attempted[:5]]) if attempted else "- (no URLs attempted)"
+
+        # If user asked for a specific product/balance, filter and answer directly
+        if should_handle_product_query and products:
+            query_tokens = set(tokenize(normalized_input))
+            stop_tokens = {
+                "give", "me", "the", "for", "a", "an", "with", "find", "show", "get",
+                "balance", "product", "products", "item", "items", "stock", "units", "unit", "of"
+            }
+            target_tokens = [t for t in query_tokens if t not in stop_tokens and len(t) > 1]
+
+            def product_score(item):
+                name = normalize_text(str(item.get("product_name", "")))
+                code = normalize_text(str(item.get("product_code", "")))
+                category = normalize_text(str(item.get("category", "")))
+                text = f"{name} {code} {category}"
+                return sum(1 for t in target_tokens if t in text)
+
+            # Special case: user asked for "with units"
+            if "units" in normalized_input and ("find" in normalized_input or "product" in normalized_input):
+                unit_matches = [p for p in products if normalize_text(str(p.get("category", ""))) == "units"]
+                preview = unit_matches[:10]
+                if preview:
+                    lines = []
+                    for idx, item in enumerate(preview, 1):
+                        lines.append(
+                            f"{idx}. {item.get('product_name', 'Unknown')} ({item.get('product_code', '')}): "
+                            f"{item.get('quantity', 0)} units"
+                        )
+                    more_note = f"\n...and {len(unit_matches) - len(preview)} more in Units." if len(unit_matches) > len(preview) else ""
+                    return (
+                        f"Products in category 'Units' from {source_url} (total: {len(unit_matches)}):\n\n"
+                        + "\n".join(lines)
+                        + more_note
+                    )
+
+            ranked = sorted(products, key=product_score, reverse=True)
+            best_matches = [p for p in ranked if product_score(p) > 0][:5]
+
+            if best_matches:
+                lines = []
+                for idx, item in enumerate(best_matches, 1):
+                    live_balance = item.get('quantity', 0)
+                    product_id = item.get('product_id')
+                    if product_id:
+                        balance_result = scraper.fetch_product_balance(product_id)
+                        if "error" not in balance_result:
+                            live_balance = balance_result.get("balance", live_balance)
+
+                    lines.append(
+                        f"{idx}. {item.get('product_name', 'Unknown')} ({item.get('product_code', '')}) - "
+                        f"Balance: {live_balance} units [{item.get('category', '')}]"
+                    )
+                return (
+                    "Here are the best product matches and balances:\n\n"
+                    + "\n".join(lines)
+                )
+
+            # No good match found; provide a helpful preview
+            preview = products[:10]
+            lines = [
+                f"{idx + 1}. {item.get('product_name', 'Unknown')} ({item.get('product_code', '')})"
+                for idx, item in enumerate(preview)
+            ]
+            return (
+                "I couldn't find an exact product match. Try a more specific name/code.\n\n"
+                "Available examples:\n" + "\n".join(lines)
+            )
+
+        lines = []
+        for idx, item in enumerate(products[:20], 1):
+            name = item.get('product_name', 'Unknown')
+            qty = item.get('quantity', 0)
+            code = item.get('product_code', '')
+            category = item.get('category', '')
+            code_str = f" ({code})" if code else ""
+            lines.append(f"{idx}. {name}{code_str}: {qty} units [{category}]")
+
+        more_note = f"\n...and {total - 20} more." if total > 20 else ""
         return (
-            "I couldn't find inventory products from the configured Stock Card/SC pages. "
-            "Please update `config/scraper_config.json` with your real company base URL and SC/inventory paths.\n\n"
-            f"Attempted URLs:\n{attempted_preview}"
+            f"Live inventory from {source_url} (total: {total} products):\n\n"
+            + "\n".join(lines) + more_note
+        )
+
+    # 2) Fallback: single-product stock-card endpoint
+    result = scraper.scrape_inventory("company_website")
+    if "error" not in result:
+        products = result.get("products", [])
+        total = result.get("total_products", len(products))
+        source_url = result.get("source_url", "configured source")
+
+        preview = products[:20]
+        lines = "\n".join([f"{idx + 1}. {name}" for idx, name in enumerate(preview)])
+        more_note = f"\n...and {total - len(preview)} more products." if total > len(preview) else ""
+        return (
+            f"Current inventory products from {source_url} (total: {total}):\n\n"
+            f"{lines}{more_note}"
+        )
+
+    # 3) Final fallback with diagnostics + local sample data
+    upstream_error = result.get("error", "Unknown scraping error")
+    upstream_status = result.get("status_code")
+    upstream_method = result.get("method")
+    upstream_url = result.get("url") or result.get("source_url")
+    upstream_text = result.get("response_text", "")
+
+    diagnostics = ""
+    if upstream_url:
+        diagnostics += f"\nUpstream URL: {upstream_url}"
+    if upstream_method:
+        diagnostics += f"\nMethod: {upstream_method}"
+    if upstream_status is not None:
+        diagnostics += f"\nStatus: {upstream_status}"
+    if upstream_error:
+        diagnostics += f"\nError: {upstream_error}"
+    if upstream_text:
+        diagnostics += f"\nResponse: {upstream_text[:220]}"
+
+    company_data = load_company_data()
+    if company_data and 'inventory' in company_data:
+        inventory_items = company_data['inventory']
+        total = len(inventory_items)
+        company_name = company_data.get('company_name', 'Company Data')
+        last_updated = company_data.get('last_updated', 'N/A')
+
+        lines = []
+        for idx, item in enumerate(inventory_items[:20], 1):
+            product = item.get('product_name', 'Unknown')
+            qty = item.get('quantity', 0)
+            unit = item.get('unit', 'units')
+            location = item.get('location', 'N/A')
+            status = item.get('status', '')
+            lines.append(f"{idx}. {product}: {qty} {unit} @ {location} [{status}]")
+
+        more_note = f"\n...and {total - 20} more items." if total > 20 else ""
+        return (
+            f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
+            f"Total products: {total}\n\n"
+            + "\n".join(lines) + more_note
+            + "\n\n⚠️ Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json."
             + (f"\n\nDiagnostics:{diagnostics}" if diagnostics else "")
         )
 
-    products = result.get("products", [])
-    total = result.get("total_products", len(products))
-    source_url = result.get("source_url", "configured source")
-
-    preview = products[:20]
-    lines = "\n".join([f"{idx + 1}. {name}" for idx, name in enumerate(preview)])
-    more_note = ""
-    if total > len(preview):
-        more_note = f"\n...and {total - len(preview)} more products."
-
+    attempted = result.get("attempted_urls", [])
+    attempted_preview = "\n".join([f"- {url}" for url in attempted[:5]]) if attempted else "- (no URLs attempted)"
     return (
-        f"Current inventory products from {source_url} (total: {total}):\n\n"
-        f"{lines}{more_note}"
+        "I couldn't find inventory products from the configured Stock Card/SC pages. "
+        "Please update `config/scraper_config.json` with your real company base URL and SC/inventory paths.\n\n"
+        f"Attempted URLs:\n{attempted_preview}"
+        + (f"\n\nDiagnostics:{diagnostics}" if diagnostics else "")
     )
 
 
@@ -987,11 +1373,56 @@ def handle_chart_request(user_input, auth_context=None):
         
         # Override config for this request
         scraper.config = chart_config
+
+        selected_product = None
+
+        # Try to resolve product name from query for dynamic product charts
+        products_result = scraper.fetch_all_products_with_stock()
+        if "error" not in products_result:
+            products = products_result.get("products", [])
+            if products:
+                query_tokens = set(tokenize(normalized_input))
+                stop_tokens = {
+                    "show", "me", "a", "an", "the", "for", "of", "with",
+                    "chart", "graph", "history", "historical", "trend", "trends",
+                    "balance", "inventory", "stock", "in", "out", "movement", "movements"
+                }
+                target_tokens = [t for t in query_tokens if t not in stop_tokens and len(t) > 1]
+
+                def product_score(item):
+                    name = normalize_text(str(item.get("product_name", "")))
+                    code = normalize_text(str(item.get("product_code", "")))
+                    category = normalize_text(str(item.get("category", "")))
+                    text = f"{name} {code} {category}"
+                    return sum(1 for t in target_tokens if t in text)
+
+                if target_tokens:
+                    ranked = sorted(products, key=product_score, reverse=True)
+                    if ranked and product_score(ranked[0]) > 0:
+                        selected_product = ranked[0]
         
         # Fetch JSON data from graph endpoint
         url = chart_config.get('url')
         method = chart_config.get('api_method', 'POST')
-        graph_data = scraper.fetch_json_api(url, method=method)
+
+        # Build payload dynamically (defaults + matched product id)
+        payload = dict(chart_config.get('api_default_body', {}))
+
+        # Dynamic date range from user query
+        parsed_dt1, parsed_dt2 = parse_chart_date_range(
+            user_input,
+            default_dt1=payload.get("dt1"),
+            default_dt2=payload.get("dt2")
+        )
+        if parsed_dt1:
+            payload["dt1"] = parsed_dt1
+        if parsed_dt2:
+            payload["dt2"] = parsed_dt2
+
+        if selected_product and selected_product.get("product_id"):
+            payload["ixProd"] = int(selected_product.get("product_id"))
+
+        graph_data = scraper.fetch_json_api(url, method=method, payload=payload)
         
         if "error" in graph_data:
             return f"Failed to fetch chart data: {graph_data.get('error')}"
@@ -1000,10 +1431,29 @@ def handle_chart_request(user_input, auth_context=None):
         begin_qty = graph_data.get('begQty', 0)
         end_qty = graph_data.get('endQty', 0)
         items = graph_data.get('items', [])
+
+        labels = []
+        balances = []
+        qty_in_series = []
+        qty_out_series = []
+
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            label = item.get('YrMo') or item.get('YrWk') or f"Point {idx + 1}"
+            labels.append(str(label))
+            balances.append(float(item.get('runBal', 0) or 0))
+            qty_in_series.append(float(item.get('tIN', 0) or 0))
+            qty_out_series.append(float(item.get('tOUT', 0) or 0))
+
+        product_label = "Selected product"
+        if selected_product:
+            product_label = f"{selected_product.get('product_name', 'Selected product')} ({selected_product.get('product_code', '')})"
         
-        summary = f"Stock movement history:\n"
+        summary = f"Stock movement history for {product_label}:\n"
         summary += f"- Beginning quantity: {begin_qty}\n"
         summary += f"- Ending quantity: {end_qty}\n"
+        summary += f"- Date range: {payload.get('dt1')} to {payload.get('dt2')}\n"
         summary += f"- Total movements: {len(items)}\n"
         
         if items:
@@ -1021,9 +1471,28 @@ def handle_chart_request(user_input, auth_context=None):
         return {
             'type': 'chart',
             'chartType': 'line',
+            'title': f"Inventory Movement - {product_label}",
+            'chartData': {
+                'labels': labels,
+                'datasets': [
+                    {
+                        'label': 'Running Balance',
+                        'data': balances
+                    },
+                    {
+                        'label': 'IN',
+                        'data': qty_in_series
+                    },
+                    {
+                        'label': 'OUT',
+                        'data': qty_out_series
+                    }
+                ]
+            },
             'summary': summary,
             'data': graph_data,
-            'source': url
+            'source': url,
+            'product': selected_product
         }
     
     except Exception as e:
@@ -1118,7 +1587,7 @@ def detect_chart_type_preference(user_input):
     return None
 
 
-def handle_balance_request(user_input):
+def handle_balance_request(user_input, auth_context=None):
     """
     Handle balance inquiry requests dynamically by loading data and generating responses.
     Supports General Ledger balance queries and is extensible for future data types.
@@ -1329,14 +1798,87 @@ def handle_balance_request(user_input):
         r"can you.*balance",
         r"what.*balance",
     ]
-    
+
+    # Direct data requests should also be handled here (not just balance wording).
+    gl_data_patterns = [
+        r"(give|show|list|provide|fetch).*(data|details|entries|accounts).*(general ledger|gl|ledger)",
+        r"(general ledger|gl|ledger).*(data|details|entries|accounts)",
+        r"can you give me.*general ledger",
+        r"what.*in.*general ledger",
+    ]
+
     is_balance_query = any(re.search(pattern, normalized_input) for pattern in balance_patterns)
-    if not is_balance_query:
-        return None
-    
-    # Check for specific data source mentions
     is_gl_query = any(term in normalized_input for term in ['general ledger', 'gl', 'ledger'])
     is_stock_query = any(term in normalized_input for term in ['stock card', 'stock', 'inventory'])
+    is_gl_data_query = is_gl_query and any(re.search(pattern, normalized_input) for pattern in gl_data_patterns)
+
+    if not is_balance_query and not is_gl_data_query:
+        return None
+
+    # Handle explicit GL data/account listing requests.
+    if is_gl_data_query:
+        try:
+            # Use the dedicated /api/lib/acc source first.
+            scraper = get_company_scraper(auth_context=auth_context)
+            gl_result = scraper.fetch_general_ledger_accounts()
+
+            if "error" not in gl_result:
+                accounts = gl_result.get("accounts", [])
+                total_accounts = gl_result.get("total_accounts", len(accounts))
+                source_url = gl_result.get("source_url", "https://clone.ulap.biz/api/lib/acc")
+
+                if isinstance(accounts, list) and total_accounts > 0:
+                    preview = accounts[:12]
+                    lines = []
+                    for idx, account in enumerate(preview, 1):
+                        if isinstance(account, dict):
+                            acc_code = (
+                                account.get("AccCd")
+                                or account.get("acctCd")
+                                or account.get("code")
+                                or account.get("acc")
+                                or ""
+                            )
+                            acc_name = (
+                                account.get("sAcc")
+                                or account.get("account")
+                                or account.get("name")
+                                or account.get("title")
+                                or "Unknown Account"
+                            )
+                            if acc_code:
+                                lines.append(f"{idx}. {acc_code} - {acc_name}")
+                            else:
+                                lines.append(f"{idx}. {acc_name}")
+                        else:
+                            lines.append(f"{idx}. {str(account)}")
+
+                    more_note = ""
+                    if total_accounts > len(preview):
+                        more_note = f"\n...and {total_accounts - len(preview)} more accounts."
+
+                    return (
+                        f"General Ledger data retrieved from {source_url}.\n"
+                        f"Total accounts: {total_accounts}\n\n"
+                        + "\n".join(lines)
+                        + more_note
+                    )
+
+            # Fallback path for GL intent when live API call fails
+            live_gl = get_live_gl_data(force_refresh=False)
+            if live_gl:
+                source = live_gl.get("source", "live source")
+                return (
+                    f"I recognized this as a General Ledger data request, but detailed account rows were unavailable right now. "
+                    f"Current GL source: {source}."
+                )
+        except Exception as e:
+            print(f"Error handling GL data request: {e}")
+
+        return (
+            "I recognized this as a General Ledger data request, but I could not fetch account rows right now. "
+            "Please verify the site token/cookie and try again."
+        )
     
     # Handle General Ledger balance queries
     if is_gl_query or (not is_stock_query and is_balance_query):
@@ -1621,125 +2163,236 @@ def handle_graph_request(user_input):
     }
 
 
+def build_system_prompt(live_context=""):
+    """Build the Ollama system prompt from the company knowledge base + optional live data."""
+    from datetime import datetime as _dt
+    today = _dt.now().strftime("%B %d, %Y")
+    knowledge_text = ""
+    try:
+        data = load_knowledge()
+        entries = data.get("knowledge", [])
+        lines = []
+        for item in entries[:40]:
+            lines.append("Q: " + item['pattern'] + "\nA: " + item['response'])
+        knowledge_text = "\n\n".join(lines)
+    except Exception:
+        pass
+    system = (
+        "You are a helpful AI assistant for a company's internal management system.\n"
+        "Today's date is " + today + ".\n\n"
+        "You help with inventory, General Ledger, accounts receivable, and financial reports.\n"
+        "Be concise and professional. If live data is provided below, use it to answer accurately.\n"
+        "For chart or graph requests, simply say a chart is being generated - do not produce raw numbers.\n\n"
+        "COMPANY KNOWLEDGE BASE:\n" + knowledge_text
+    )
+    if live_context:
+        system += "\n\nLIVE DATA (just fetched from the system):\n" + live_context
+    return system
+
+
+def fetch_relevant_live_data(user_input, auth_context=None):
+    """Detect intent and pre-fetch live API data to pass as context to Ollama."""
+    if not SCRAPER_AVAILABLE:
+        return ""
+    normalized = normalize_text(user_input)
+    context_parts = []
+
+    # Inventory / product intent
+    inventory_triggers = ["inventory", "stock card", "stock", "product", "on hand"]
+    if any(t in normalized for t in inventory_triggers) and not any(w in normalized for w in ["chart", "graph"]):
+        try:
+            scraper = get_company_scraper(auth_context)
+            result = scraper.fetch_all_products_with_stock()
+            if "error" not in result:
+                products = result.get("products", [])
+                total = len(products)
+                preview = products[:25]
+                lines = []
+                for p in preview:
+                    lines.append(
+                        "- " + str(p.get('product_name', 'Unknown')) +
+                        " (" + str(p.get('product_code', '')) + "): " +
+                        str(p.get('quantity', 0)) + " units [" + str(p.get('category', '')) + "]"
+                    )
+                more = "\n...and " + str(total - len(preview)) + " more." if total > len(preview) else ""
+                context_parts.append("INVENTORY (" + str(total) + " total products):\n" + "\n".join(lines) + more)
+        except Exception as e:
+            print("[live data] inventory fetch error: " + str(e))
+
+    # General Ledger intent
+    gl_triggers = ["general ledger", " gl ", "ledger", "balance", "accounts"]
+    if any(t in normalized for t in gl_triggers) and "receivable" not in normalized:
+        try:
+            scraper = get_company_scraper(auth_context)
+            result = scraper.fetch_general_ledger_accounts()
+            if "error" not in result:
+                accounts = result.get("accounts", [])[:20]
+                lines = []
+                for acc in accounts:
+                    code = acc.get("AccCd") or acc.get("acctCd") or acc.get("code") or ""
+                    name = acc.get("sAcc") or acc.get("account") or acc.get("name") or "Unknown"
+                    lines.append("- " + code + ": " + name if code else "- " + name)
+                context_parts.append("GENERAL LEDGER ACCOUNTS:\n" + "\n".join(lines))
+        except Exception as e:
+            print("[live data] GL fetch error: " + str(e))
+
+    # Accounts Receivable intent
+    ar_triggers = ["receivable", "customers with debt", "customer debt", "outstanding", "ar report", "accounts receivable"]
+    if any(t in normalized for t in ar_triggers):
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "scraper_config.json")
+            with open(config_path) as f:
+                full_config = json.load(f)
+            ar_config = full_config.get("accounts_receivable", {})
+            if ar_config:
+                ar_scraper = WebScraper(
+                    proxy=None,
+                    auth_token=ar_config.get("api_fixed_auth_token"),
+                    auth_header_name=ar_config.get("api_fixed_auth_header", "x-access-tokens"),
+                    config=ar_config,
+                )
+                result = ar_scraper.fetch_json_api(
+                    ar_config.get("url"),
+                    method=ar_config.get("api_method", "POST"),
+                    payload=ar_config.get("api_default_body", {}),
+                )
+                if "error" not in result:
+                    context_parts.append(
+                        "ACCOUNTS RECEIVABLE DATA:\n" + json.dumps(result, indent=2)[:2000]
+                    )
+                else:
+                    context_parts.append(
+                        "ACCOUNTS RECEIVABLE: Could not fetch live data - " +
+                        str(result.get('error', 'unknown error')) +
+                        ". The AR endpoint may need configuration at clone.ulap.biz."
+                    )
+        except Exception as e:
+            print("[live data] AR fetch error: " + str(e))
+
+    return "\n\n".join(context_parts)
+
+
+def ollama_respond(user_input, live_context="", history=None):
+    """Send user input to the local Ollama model and return the response."""
+    if not OLLAMA_AVAILABLE or _ollama_lib is None:
+        return None
+    system_prompt = build_system_prompt(live_context)
+    messages = [{"role": "system", "content": system_prompt}]
+    if history:
+        for exchange in history[-6:]:
+            messages.append({"role": "user", "content": exchange.get("user", "")})
+            ai_resp = exchange.get("ai", "")
+            if isinstance(ai_resp, dict) or (isinstance(ai_resp, str) and ai_resp.strip().startswith("{")):
+                ai_resp = "[A chart or structured data visualization was shown to the user]"
+            messages.append({"role": "assistant", "content": str(ai_resp)})
+    messages.append({"role": "user", "content": user_input})
+    try:
+        response = _ollama_lib.chat(model=OLLAMA_MODEL, messages=messages)
+        return response["message"]["content"].strip()
+    except Exception as e:
+        print("[Ollama] error: " + str(e))
+        return None
+
+
 def respond(user_input, site_context=None):
     global balance_context, conversation_history, extracted_context
-    
-    # Load conversation history from persistent store
+
     load_conversation_store()
-    
-    # Extract context from current input
     extract_context_from_input(user_input)
-    
-    # Check conversation history for relevant context
-    relevant_history = get_relevant_history(user_input, max_results=3)
-    
-    # Check if user is confirming a chart generation offer
-    # by looking at conversation history
+
+    normalized = normalize_text(user_input)
+
+    # Charts/graphs always use the structured handler - frontend needs the data format
+    is_chart_request = any(w in normalized for w in ["chart", "graph", "visual", "movement history"])
+    if is_chart_request:
+        if is_affirmation(user_input) and conversation_history:
+            last_ai_raw = conversation_history[-1]['ai']
+            last_ai_str = str(last_ai_raw).lower() if isinstance(last_ai_raw, dict) else last_ai_raw.lower()
+            if any(p in last_ai_str for p in [
+                "would you like me to generate a chart",
+                "would you like to see a chart",
+                "want me to show you a chart",
+            ]):
+                chart = handle_chart_from_balance_context()
+                if chart:
+                    return chart
+        live_chart = handle_chart_request(user_input)
+        if live_chart:
+            return live_chart
+        graph = handle_graph_request(user_input)
+        if graph:
+            return graph
+
+    # Branches returns a structured signal - frontend depends on this format
+    branches = handle_branches_request(user_input)
+    if branches:
+        return branches
+
+    # --- Primary path: Ollama AI ---
+    if OLLAMA_AVAILABLE:
+        live_context = fetch_relevant_live_data(user_input)
+        ollama_answer = ollama_respond(user_input, live_context=live_context, history=conversation_history)
+        if ollama_answer:
+            return ollama_answer
+
+    # --- Fallback: original rule-based system (used when Ollama is not running) ---
     if is_affirmation(user_input) and conversation_history:
-        # Check if the last AI response asked about generating a chart
-        last_ai_response_raw = conversation_history[-1]['ai'] if conversation_history else ""
-        # Handle AI response that might be a dict (chart data) or string
-        if isinstance(last_ai_response_raw, dict):
-            last_ai_response = str(last_ai_response_raw).lower()
-        else:
-            last_ai_response = last_ai_response_raw.lower()
-        
-        if any(phrase in last_ai_response for phrase in [
+        last_ai_raw = conversation_history[-1]['ai'] if conversation_history else ""
+        last_ai = str(last_ai_raw).lower() if isinstance(last_ai_raw, dict) else last_ai_raw.lower()
+        if any(phrase in last_ai for phrase in [
             "would you like me to generate a chart",
             "would you like to see a chart",
             "want me to show you a chart",
-            "want to see this visualized",
             "balance.*evolved"
         ]):
-            # User is confirming the chart offer from previous response
             chart_response = handle_chart_from_balance_context()
             if chart_response:
                 return chart_response
-    
-    # Check if user is referring to something from past conversation
-    # (words like "that", "it", "the", "this" without clear subject)
-    reference_words = ['that', 'it', 'the one', 'that one', 'this', 'what you mentioned']
-    is_referencing = any(word in user_input.lower() for word in reference_words)
-    
-    if is_referencing and relevant_history:
-        # User is likely referring to something we discussed before
-        past_context = relevant_history[0]
-        # Continue using the same context from previous interaction
-        balance_context = balance_context or {
-            'referenced_exchange': past_context['user'],
-            'previous_response': past_context['ai']
-        }
 
-    # Handle greetings/chitchat with a deterministic response
     greeting_response = handle_greeting_request(user_input)
     if greeting_response:
         return greeting_response
-    
-    # Check for inventory/stock card requests
+
     inventory_response = handle_inventory_request(user_input, site_context=site_context)
     if inventory_response:
         return inventory_response
 
-    # Check for web scraping requests
     scrape_response = handle_scrape_request(user_input)
     if scrape_response:
         return scrape_response
-    
-    # Check for balance inquiries (dynamic generation)
+
     balance_response = handle_balance_request(user_input)
     if balance_response:
         return balance_response
-    
-    # Check for graph generation requests
-    graph_response = handle_graph_request(user_input)
-    if graph_response:
-        return graph_response
-    
-    # Try math first
+
     math_answer = try_math(user_input)
     if math_answer:
         return math_answer
 
-    # Auto-ground factual questions from proxied company website when relevant
     live_site_response = answer_from_live_site(user_input, site_context=site_context)
     if live_site_response:
         return live_site_response
 
-    # Check knowledge base first (for greetings and saved knowledge)
     stored_response, context_matches = check_knowledge(user_input)
     if stored_response:
         return stored_response
 
-    # Search Wikipedia articles database for relevant context
     relevant_articles = search_articles(user_input, max_results=3)
-    
     if relevant_articles:
-        # Verify we have strong matches before using them
         query_tokens = set(tokenize(user_input))
-        
-        # Extract relevant text from top articles
         context_parts = []
-        for article in relevant_articles[:2]:  # Use top 2 articles
+        for article in relevant_articles[:2]:
             relevant_text = extract_relevant_text(article['content'], query_tokens, max_length=400)
-            if relevant_text and len(relevant_text) > 50:  # Only use non-empty, substantial responses
+            if relevant_text and len(relevant_text) > 50:
                 context_parts.append(relevant_text)
-        
         if context_parts:
-            # Format into a natural, conversational response
-            natural_response = format_natural_response(context_parts, user_input)
-            return natural_response
-    
-    # If we have context matches from knowledge base, use them
+            return format_natural_response(context_parts, user_input)
+
     if context_matches:
-        # Return best matching response from knowledge base
         best_match = max(context_matches, key=lambda x: combined_similarity(user_input, x['pattern']))
         return best_match['response']
-    
-    # No relevant context found
+
     return None
-
-
- 
 
 def main():
     print("AI Assistant Started")

@@ -17,6 +17,45 @@
         <div class="header">
           <h1>pythonAI prototype</h1>
           <p class="subtitle">Powered by Ollama + Python</p>
+          <button
+            id="connectBtn"
+            class="connect-btn"
+            title="Connect to company system"
+          >
+            🔗 Connect Account
+          </button>
+        </div>
+
+        <!-- Connect / Login Panel -->
+        <div id="connectPanel" class="connect-panel hidden">
+          <div class="connect-panel-inner">
+            <strong>Connect to Company System</strong>
+            <p class="connect-hint">
+              Enter your clone.ulap.biz credentials so the AI can access live
+              data.
+            </p>
+            <form id="connectForm">
+              <input
+                type="email"
+                id="siteUsername"
+                placeholder="Email / Username"
+                autocomplete="username"
+                required
+              />
+              <input
+                type="password"
+                id="sitePassword"
+                placeholder="Password"
+                autocomplete="current-password"
+                required
+              />
+              <div class="connect-actions">
+                <button type="submit" id="connectSubmitBtn">Connect</button>
+                <button type="button" id="connectCancelBtn">Cancel</button>
+              </div>
+            </form>
+            <div id="connectStatus" class="connect-status"></div>
+          </div>
         </div>
 
         <!-- Chat Messages -->

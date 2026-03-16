@@ -5,7 +5,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start:dev": "nodemon server.js",
+    "ui": "node server.js",
+    "dev": "nodemon server.js",
+    "ai": "python3 -m src.main",
+    "api": "python3 -m src.fastapi_server",
+    "api:dev": "/Users/mcbair/Library/Python/3.9/bin/uvicorn src.fastapi_server:app --reload --port 8000"
   },
   "keywords": [
     "ai",
