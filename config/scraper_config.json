@@ -5,7 +5,7 @@
     "api_method": "POST",
     "api_data_path": "data",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/sc",
@@ -36,7 +36,7 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/sc",
@@ -58,7 +58,7 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/sc",
@@ -73,7 +73,7 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/gl",
@@ -89,7 +89,7 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/gl",
@@ -108,7 +108,7 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/gl",
@@ -131,7 +131,7 @@
     "is_json_api": true,
     "api_method": "POST",
     "api_fixed_auth_header": "x-access-tokens",
-    "api_fixed_auth_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX3V1aWQiOiJhMzM1MTI0Yi00NmI5LTQzYzItOGM4NS1mMmZiYWIzZmRjNGUiLCJ1c2VybmFtZSI6Im1lcmx2aW5qYWtlMjAwNEBnbWFpbC5jb20iLCJiaXoiOiJLWXYiLCJzZWxlY3QtYml6IjoiS3YiLCJleHAiOjE3NzM0MzQ2MTV9.rK1qGCcsL59en9IXZo3mcNLzg2H-Zr6ZaAcpVht6f8o",
+    "api_fixed_auth_token": "",
     "api_fixed_cookie": "devID=6515450",
     "api_fixed_headers": {
       "Referer": "https://clone.ulap.biz/app/reports/ar",

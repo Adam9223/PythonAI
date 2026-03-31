@@ -101,6 +101,34 @@ npm start
 
 ## 🚀 Startup Instructions
 
+## 🦙 Llama Chatbot Mode (Ollama)
+
+The chatbot now uses Ollama + Llama first, then falls back to rule-based behavior only if the model is unavailable.
+
+### 1. Make sure Ollama is running
+
+```bash
+ollama serve
+```
+
+### 2. Ensure a Llama model is installed
+
+```bash
+ollama pull llama3
+```
+
+### 3. (Optional) Pin a model in .env
+
+```bash
+OLLAMA_MODEL=llama3:latest
+```
+
+You can also use `LLAMA_MODEL` as an alias if you prefer that variable name.
+
+### 4. Start app/API from the same Python environment
+
+The Node server now auto-detects your active virtualenv Python, so the `ollama` Python package is available during chat requests.
+
 ### Option A: API Only (Production)
 
 ```bash

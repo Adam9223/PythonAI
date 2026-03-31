@@ -34,7 +34,20 @@ if SCRAPER_AVAILABLE and _scraper_auto_login is not None:
         pass
 
 # Ollama local LLM integration
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+# Default to ultra-lightweight qwen2.5:0.5b (397MB, 10-15x faster than llama3)
+# Set env vars OLLAMA_MODEL or LLAMA_MODEL to override:
+#   OLLAMA_MODEL=mistral:latest  (4.1GB, balanced)
+#   OLLAMA_MODEL=llama3:latest   (4.7GB, slower but higher quality)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", os.getenv("LLAMA_MODEL", "qwen2.5:0.5b"))
+OLLAMA_FALLBACK_MODELS = [
+    m.strip() for m in os.getenv("OLLAMA_FALLBACK_MODELS", f"{OLLAMA_MODEL},llama3:latest").split(",") if m.strip()
+]
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "1024"))
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "100"))
+OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", "0.2"))
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "2m")
+OLLAMA_THINK = os.getenv("OLLAMA_THINK", "none")
+OLLAMA_LIVE_CONTEXT_MAX_CHARS = int(os.getenv("OLLAMA_LIVE_CONTEXT_MAX_CHARS", "1200"))
 OLLAMA_AVAILABLE = False
 _ollama_lib = None
 try:
@@ -889,13 +902,13 @@ def answer_from_live_site(user_input, site_context=None):
 
 def handle_scrape_request(user_input):
     """Handle web scraping requests"""
-    if not SCRAPER_AVAILABLE:
-        return "Web scraping is not available. Please install required packages: pip install requests beautifulsoup4"
-    
     # Check if user is asking to scrape a website
     scrape_keywords = ['scrape', 'fetch', 'get data from', 'extract from', 'pull data from']
     if not any(keyword in user_input.lower() for keyword in scrape_keywords):
         return None
+
+    if not SCRAPER_AVAILABLE:
+        return "Web scraping is not available. Please install required packages: pip install requests beautifulsoup4"
     
     # Check for URL in the input
     url_match = re.search(r'https?://[^\s]+', user_input)
@@ -1308,7 +1321,8 @@ def handle_inventory_request(user_input, site_context=None, auth_token=None, aut
             f"Current inventory from {company_name} (Last updated: {last_updated}):\n"
             f"Total products: {total}\n\n"
             + "\n".join(lines) + more_note
-            + "\n\n⚠️ Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json."
+            + "\n\n⚠️ Web scraping failed. Using fallback data from company_data.json."
+            + "\nIf diagnostics show 401 Invalid token, reconnect account and ensure browser session token/cookie is provided."
             + (f"\n\nDiagnostics:{diagnostics}" if diagnostics else "")
         )
 
@@ -2172,22 +2186,71 @@ def build_system_prompt(live_context=""):
         data = load_knowledge()
         entries = data.get("knowledge", [])
         lines = []
-        for item in entries[:40]:
+        # Limit to 10 entries instead of 40 for faster response time
+        for item in entries[:10]:
             lines.append("Q: " + item['pattern'] + "\nA: " + item['response'])
         knowledge_text = "\n\n".join(lines)
     except Exception:
         pass
+    # Simplified system prompt for faster inference
     system = (
-        "You are a helpful AI assistant for a company's internal management system.\n"
-        "Today's date is " + today + ".\n\n"
-        "You help with inventory, General Ledger, accounts receivable, and financial reports.\n"
-        "Be concise and professional. If live data is provided below, use it to answer accurately.\n"
-        "For chart or graph requests, simply say a chart is being generated - do not produce raw numbers.\n\n"
-        "COMPANY KNOWLEDGE BASE:\n" + knowledge_text
+        "You are a helpful AI assistant for a company's business system.\n"
+        "Be concise, fast, and accurate. Today: " + today + ".\n"
+        "Answer about inventory, financials, and system data using provided context.\n"
     )
+    if knowledge_text:
+        system += "Knowledge base:\n" + knowledge_text
     if live_context:
-        system += "\n\nLIVE DATA (just fetched from the system):\n" + live_context
+        system += "\n\nCurrent data:\n" + live_context[:OLLAMA_LIVE_CONTEXT_MAX_CHARS]
     return system
+
+
+def should_fetch_live_context(user_input):
+    """Avoid expensive live-data calls for generic conversation."""
+    normalized = normalize_text(user_input)
+    fast_skip = ["hello", "hi", "hey", "thanks", "thank you", "ok", "sure", "bye"]
+    if any(term == normalized for term in fast_skip):
+        return False
+
+    live_markers = [
+        "inventory", "stock", "product", "balance", "ledger", "account", "receivable",
+        "report", "current", "latest", "available", "on hand", "branch", "warehouse",
+    ]
+    return any(marker in normalized for marker in live_markers)
+
+
+def get_connection_status_response(user_input):
+    """Provide a fast direct answer for account/session status questions."""
+    normalized = normalize_text(user_input)
+    patterns = [
+        r"are\s+there\s+any\s+accounts?\s+logged\s+in",
+        r"are\s+there\s+any\s+accounts?\s+currently\s+logged\s+in",
+        r"accounts?\s+logged\s+in",
+        r"who\s+is\s+logged\s+in",
+    ]
+    if not any(re.search(p, normalized) for p in patterns):
+        return None
+
+    has_saved_creds = bool((os.getenv("SITE_USERNAME") or "").strip() and (os.getenv("SITE_PASSWORD") or "").strip())
+    has_token = False
+    try:
+        cfg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "scraper_config.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r") as f:
+                cfg = json.load(f)
+            for section in cfg.values():
+                if isinstance(section, dict) and str(section.get("api_fixed_auth_token", "")).strip():
+                    has_token = True
+                    break
+    except Exception:
+        has_token = False
+
+    if has_saved_creds and has_token:
+        user = (os.getenv("SITE_USERNAME") or "saved credentials").strip()
+        return (
+            f"A company account is connected ({user}), but I cannot list active website user sessions from this endpoint."
+        )
+    return "No connected company account is currently stored."
 
 
 def fetch_relevant_live_data(user_input, auth_context=None):
@@ -2206,7 +2269,7 @@ def fetch_relevant_live_data(user_input, auth_context=None):
             if "error" not in result:
                 products = result.get("products", [])
                 total = len(products)
-                preview = products[:25]
+                preview = products[:12]
                 lines = []
                 for p in preview:
                     lines.append(
@@ -2226,7 +2289,7 @@ def fetch_relevant_live_data(user_input, auth_context=None):
             scraper = get_company_scraper(auth_context)
             result = scraper.fetch_general_ledger_accounts()
             if "error" not in result:
-                accounts = result.get("accounts", [])[:20]
+                accounts = result.get("accounts", [])[:12]
                 lines = []
                 for acc in accounts:
                     code = acc.get("AccCd") or acc.get("acctCd") or acc.get("code") or ""
@@ -2258,7 +2321,7 @@ def fetch_relevant_live_data(user_input, auth_context=None):
                 )
                 if "error" not in result:
                     context_parts.append(
-                        "ACCOUNTS RECEIVABLE DATA:\n" + json.dumps(result, indent=2)[:2000]
+                        "ACCOUNTS RECEIVABLE DATA:\n" + json.dumps(result, indent=2)[:1000]
                     )
                 else:
                     context_parts.append(
@@ -2279,28 +2342,51 @@ def ollama_respond(user_input, live_context="", history=None):
     system_prompt = build_system_prompt(live_context)
     messages = [{"role": "system", "content": system_prompt}]
     if history:
-        for exchange in history[-6:]:
+        for exchange in history[-3:]:
             messages.append({"role": "user", "content": exchange.get("user", "")})
             ai_resp = exchange.get("ai", "")
             if isinstance(ai_resp, dict) or (isinstance(ai_resp, str) and ai_resp.strip().startswith("{")):
                 ai_resp = "[A chart or structured data visualization was shown to the user]"
             messages.append({"role": "assistant", "content": str(ai_resp)})
     messages.append({"role": "user", "content": user_input})
-    try:
-        response = _ollama_lib.chat(model=OLLAMA_MODEL, messages=messages)
-        return response["message"]["content"].strip()
-    except Exception as e:
-        print("[Ollama] error: " + str(e))
-        return None
+    options = {
+        "num_ctx": OLLAMA_NUM_CTX,
+        "num_predict": OLLAMA_NUM_PREDICT,
+        "temperature": OLLAMA_TEMPERATURE,
+    }
+    model_candidates = OLLAMA_FALLBACK_MODELS if OLLAMA_FALLBACK_MODELS else [OLLAMA_MODEL]
+    for model_name in model_candidates:
+        try:
+            chat_kwargs = {
+                "model": model_name,
+                "messages": messages,
+                "options": options,
+                "keep_alive": OLLAMA_KEEP_ALIVE,
+            }
+            if str(OLLAMA_THINK).strip().lower() not in {"", "none", "off", "false", "0"}:
+                chat_kwargs["think"] = OLLAMA_THINK
+
+            response = _ollama_lib.chat(**chat_kwargs)
+            content = response.get("message", {}).get("content", "")
+            if content:
+                return content.strip()
+        except Exception as e:
+            print("[Ollama] model " + model_name + " error: " + str(e))
+            continue
+    return None
 
 
-def respond(user_input, site_context=None):
+def respond(user_input, site_context=None, auth_context=None):
     global balance_context, conversation_history, extracted_context
 
     load_conversation_store()
     extract_context_from_input(user_input)
 
     normalized = normalize_text(user_input)
+
+    connection_status = get_connection_status_response(user_input)
+    if connection_status:
+        return connection_status
 
     # Charts/graphs always use the structured handler - frontend needs the data format
     is_chart_request = any(w in normalized for w in ["chart", "graph", "visual", "movement history"])
@@ -2330,7 +2416,9 @@ def respond(user_input, site_context=None):
 
     # --- Primary path: Ollama AI ---
     if OLLAMA_AVAILABLE:
-        live_context = fetch_relevant_live_data(user_input)
+        live_context = ""
+        if should_fetch_live_context(user_input):
+            live_context = fetch_relevant_live_data(user_input, auth_context=auth_context)
         ollama_answer = ollama_respond(user_input, live_context=live_context, history=conversation_history)
         if ollama_answer:
             return ollama_answer

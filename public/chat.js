@@ -12,16 +12,45 @@ const connectForm = document.getElementById("connectForm");
 const connectStatus = document.getElementById("connectStatus");
 const connectSubmitBtn = document.getElementById("connectSubmitBtn");
 const connectCancelBtn = document.getElementById("connectCancelBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const connectedAccountInfo = document.getElementById("connectedAccountInfo");
+const siteUsernameInput = document.getElementById("siteUsername");
+const sitePasswordInput = document.getElementById("sitePassword");
+const termsCheckbox = document.getElementById("termsCheckbox");
+const termsContainer = connectForm.querySelector(".terms-checkbox");
 
 // Reflect saved connection state from localStorage
 function refreshConnectBtnLabel() {
   const connected = localStorage.getItem("siteConnected") === "true";
+  const connectedAccount =
+    localStorage.getItem("siteConnectedAccount") || "saved account";
+
   if (connected) {
     connectBtn.textContent = "✅ Connected";
     connectBtn.classList.add("connected");
+
+    siteUsernameInput.classList.add("hidden");
+    sitePasswordInput.classList.add("hidden");
+    termsContainer.classList.add("hidden");
+    connectSubmitBtn.classList.add("hidden");
+    connectCancelBtn.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+
+    connectedAccountInfo.textContent = `account currently logged in: ${connectedAccount}`;
+    connectedAccountInfo.classList.remove("hidden");
   } else {
     connectBtn.textContent = "🔗 Connect Account";
     connectBtn.classList.remove("connected");
+
+    siteUsernameInput.classList.remove("hidden");
+    sitePasswordInput.classList.remove("hidden");
+    termsContainer.classList.remove("hidden");
+    connectSubmitBtn.classList.remove("hidden");
+    connectCancelBtn.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+
+    connectedAccountInfo.textContent = "";
+    connectedAccountInfo.classList.add("hidden");
   }
 }
 
@@ -44,11 +73,48 @@ connectBtn.addEventListener("click", () => {
 
 connectCancelBtn.addEventListener("click", closeConnectPanel);
 
+logoutBtn.addEventListener("click", async () => {
+  logoutBtn.disabled = true;
+  connectStatus.textContent = "Logging out...";
+  connectStatus.className = "connect-status";
+
+  try {
+    const res = await fetch("/api/auth/site-logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      localStorage.setItem("siteConnected", "false");
+      localStorage.removeItem("siteConnectedAccount");
+      refreshConnectBtnLabel();
+      connectStatus.textContent = "✅ Logged out successfully.";
+      connectStatus.className = "connect-status success";
+      setTimeout(closeConnectPanel, 1200);
+    } else {
+      connectStatus.textContent = "❌ " + (data.error || "Failed to log out.");
+      connectStatus.className = "connect-status error";
+    }
+  } catch (err) {
+    connectStatus.textContent = "❌ Could not reach server.";
+    connectStatus.className = "connect-status error";
+  } finally {
+    logoutBtn.disabled = false;
+  }
+});
+
 connectForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const username = document.getElementById("siteUsername").value.trim();
-  const password = document.getElementById("sitePassword").value;
+  const username = siteUsernameInput.value.trim();
+  const password = sitePasswordInput.value;
+
   if (!username || !password) return;
+  if (!termsCheckbox.checked) {
+    connectStatus.textContent = "❌ Please agree to the Terms and Conditions.";
+    connectStatus.className = "connect-status error";
+    return;
+  }
 
   connectSubmitBtn.disabled = true;
   connectStatus.textContent = "Connecting…";
@@ -63,9 +129,11 @@ connectForm.addEventListener("submit", async (e) => {
     const data = await res.json();
     if (res.ok && data.success) {
       localStorage.setItem("siteConnected", "true");
+      localStorage.setItem("siteConnectedAccount", username);
       refreshConnectBtnLabel();
+      const warningSuffix = data.warning ? ` (${data.warning})` : "";
       connectStatus.textContent =
-        "✅ Connected! The AI can now access live data.";
+        "✅ Connected! The AI can now access live data." + warningSuffix;
       connectStatus.className = "connect-status success";
       setTimeout(closeConnectPanel, 1800);
     } else {
@@ -223,8 +291,20 @@ function scrollToBottom() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+function formatResponseTime(ms) {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "Responded in --";
+  }
+
+  if (ms < 1000) {
+    return `Responded in ${Math.round(ms)}ms`;
+  }
+
+  return `Responded in ${(ms / 1000).toFixed(2)}s`;
+}
+
 // Add message to chat (text or chart)
-function addMessage(data, isUser = false) {
+function addMessage(data, isUser = false, responseTimeMs = null) {
   const messageDiv = document.createElement("div");
   messageDiv.className = `message ${isUser ? "user-message" : "ai-message"}`;
 
@@ -234,6 +314,8 @@ function addMessage(data, isUser = false) {
 
   const content = document.createElement("div");
   content.className = "message-content";
+  const messageBody = document.createElement("div");
+  messageBody.className = "message-body";
 
   // Check if this is chart data
   if (
@@ -248,8 +330,18 @@ function addMessage(data, isUser = false) {
       typeof data === "string" ? data : JSON.stringify(data);
   }
 
+  messageBody.appendChild(content);
+
+  if (!isUser && Number.isFinite(responseTimeMs)) {
+    const responseTime = document.createElement("div");
+    responseTime.className = "response-time";
+    responseTime.textContent = formatResponseTime(responseTimeMs);
+    messageBody.appendChild(responseTime);
+  }
+
   messageDiv.appendChild(avatar);
-  messageDiv.appendChild(content);
+  messageDiv.appendChild(messageBody);
+
   chatMessages.appendChild(messageDiv);
 
   scrollToBottom();
@@ -441,12 +533,22 @@ function addLoadingMessage() {
   content.className = "message-content";
   content.textContent = "Thinking...";
 
+  const messageBody = document.createElement("div");
+  messageBody.className = "message-body";
+
+  const responseTime = document.createElement("div");
+  responseTime.className = "response-time";
+  responseTime.textContent = "Responded in 0ms";
+
+  messageBody.appendChild(content);
+  messageBody.appendChild(responseTime);
+
   messageDiv.appendChild(avatar);
-  messageDiv.appendChild(content);
+  messageDiv.appendChild(messageBody);
   chatMessages.appendChild(messageDiv);
 
   scrollToBottom();
-  return messageDiv;
+  return { messageDiv, responseTime };
 }
 
 // Send message
@@ -465,8 +567,14 @@ async function sendMessage(event) {
   userInput.value = "";
 
   // Show loading
-  const loadingMsg = addLoadingMessage();
+  const loading = addLoadingMessage();
+  const loadingMsg = loading.messageDiv;
   updateStatus("Sending...", "default");
+  const requestStartTime = performance.now();
+  const loadingTimer = setInterval(() => {
+    const elapsed = performance.now() - requestStartTime;
+    loading.responseTime.textContent = formatResponseTime(elapsed);
+  }, 100);
 
   try {
     const response = await fetch("/api/chat", {
@@ -478,8 +586,10 @@ async function sendMessage(event) {
     });
 
     const data = await response.json();
+    const elapsedMs = performance.now() - requestStartTime;
 
     // Remove loading message
+    clearInterval(loadingTimer);
     loadingMsg.remove();
 
     if (response.ok) {
@@ -507,21 +617,32 @@ async function sendMessage(event) {
             : null;
 
       if (chartData) {
-        addMessage(chartData, false);
+        addMessage(chartData, false, elapsedMs);
       } else {
-        addMessage(responseData || "I couldn't process that.", false);
+        addMessage(
+          responseData || "I couldn't process that.",
+          false,
+          elapsedMs,
+        );
       }
       updateStatus("Ready", "success");
     } else {
       addMessage(
         data.response || "Something went wrong. Please try again.",
         false,
+        elapsedMs,
       );
       updateStatus("Error", "error");
     }
   } catch (error) {
+    const elapsedMs = performance.now() - requestStartTime;
+    clearInterval(loadingTimer);
     loadingMsg.remove();
-    addMessage("Sorry, I encountered an error. Is the server running?", false);
+    addMessage(
+      "Sorry, I encountered an error. Is the server running?",
+      false,
+      elapsedMs,
+    );
     updateStatus("Error: " + error.message, "error");
     console.error("Error:", error);
   } finally {

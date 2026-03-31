@@ -1,291 +1,104 @@
 {
   "history": [
     {
-      "user": "yes",
-      "ai": "{\"type\": \"chart\", \"chartType\": \"line\", \"title\": \"General Ledger - Running Balance\", \"chartData\": {\"labels\": [\"2026-01\", \"2026-01\", \"2026-01\", \"2026-01\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-04\", \"2026-04\", \"2026-04\", \"2026-04\"], \"datasets\": [{\"label\": \"Running Balance\", \"data\": [335828643.7536, 335828643.7536, 335828643.7536, 335828543.7536, 336012615.1821, 336012615.1821, 336080706.2535, 336148240.1821, 336146885.1821, 336146530.1821, 336146530.1821, 336136530.1821], \"borderColor\": \"rgba(255, 140, 0, 1)\", \"backgroundColor\": \"rgba(255, 140, 0, 0.1)\", \"tension\": 0.4}]}}",
-      "timestamp": 1772760337.75732
+      "user": "show me a scatter chart",
+      "ai": "Current inventory from Your Company Name (Last updated: 2026-03-06):\nTotal products: 3\n\n1. Widget A: 150 pcs @ Warehouse 1 [In Stock]\n2. Widget B: 80 pcs @ Warehouse 2 [In Stock]\n3. Gadget X: 25 pcs @ Warehouse 1 [Low Stock]\n\n\ud83d\udca1 Update company_data.json to refresh this data.",
+      "timestamp": 1773028147.386028
     },
     {
-      "user": "now give me the chart of the current credit and debit",
-      "ai": {
-        "type": "chart",
-        "chartType": "line",
-        "title": "General Ledger - Running Balance",
-        "chartData": {
-          "labels": [
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-04",
-            "2026-04",
-            "2026-04",
-            "2026-04"
-          ],
-          "datasets": [
-            {
-              "label": "Running Balance",
-              "data": [
-                335828643.7536,
-                335828643.7536,
-                335828643.7536,
-                335828543.7536,
-                336012615.1821,
-                336012615.1821,
-                336080706.2535,
-                336148240.1821,
-                336146885.1821,
-                336146530.1821,
-                336146530.1821,
-                336136530.1821
-              ],
-              "borderColor": "rgba(102, 126, 234, 1)",
-              "backgroundColor": "rgba(102, 126, 234, 0.1)",
-              "tension": 0.4,
-              "yAxisID": "y"
-            }
-          ]
-        }
-      },
-      "timestamp": 1772760358.6265862
+      "user": "testing",
+      "ai": "No issues detected!",
+      "timestamp": 1774405493.3404858
     },
     {
-      "user": "give me the chart of the current credit and debit",
-      "ai": "{\"type\": \"chart\", \"chartType\": \"bar\", \"title\": \"General Ledger - Debits vs Credits\", \"chartData\": {\"labels\": [\"2026-01\", \"2026-01\", \"2026-01\", \"2026-01\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-04\", \"2026-04\", \"2026-04\", \"2026-04\"], \"datasets\": [{\"label\": \"Debits\", \"data\": [31467, 18000, 39365, 9734, 251099.2585, 44540, 96629.0714, 148364, 133060, 41632, 13950, 44938], \"backgroundColor\": \"rgba(102, 126, 234, 0.8)\"}, {\"label\": \"Credits\", \"data\": [31467, 18000, 39365, 9834, 67027.83, 44540, 28538, 80830.0714, 134415, 41987, 13950, 54938], \"backgroundColor\": \"rgba(237, 100, 166, 0.8)\"}]}}",
-      "timestamp": 1772760882.6022139
+      "user": "hello",
+      "ai": "Hi! How can I assist you today?",
+      "timestamp": 1774406132.397442
     },
     {
-      "user": "give me a historical graph of it not a bar chart",
-      "ai": {
-        "type": "chart",
-        "chartType": "bar",
-        "title": "General Ledger - Debits vs Credits",
-        "chartData": {
-          "labels": [
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-04",
-            "2026-04",
-            "2026-04",
-            "2026-04"
-          ],
-          "datasets": [
-            {
-              "label": "Debits",
-              "data": [
-                31467,
-                18000,
-                39365,
-                9734,
-                251099.2585,
-                44540,
-                96629.0714,
-                148364,
-                133060,
-                41632,
-                13950,
-                44938
-              ],
-              "backgroundColor": "rgba(102, 126, 234, 0.8)"
-            },
-            {
-              "label": "Credits",
-              "data": [
-                31467,
-                18000,
-                39365,
-                9834,
-                67027.83,
-                44540,
-                28538,
-                80830.0714,
-                134415,
-                41987,
-                13950,
-                54938
-              ],
-              "backgroundColor": "rgba(237, 100, 166, 0.8)"
-            }
-          ]
-        }
-      },
-      "timestamp": 1772760900.180576
-    },
-    {
-      "user": "give me a historical graph of it not a bar chart",
-      "ai": "{\"type\": \"chart\", \"chartType\": \"line\", \"title\": \"General Ledger - Debits vs Credits\", \"chartData\": {\"labels\": [\"2026-01\", \"2026-01\", \"2026-01\", \"2026-01\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-04\", \"2026-04\", \"2026-04\", \"2026-04\"], \"datasets\": [{\"label\": \"Debits\", \"data\": [31467, 18000, 39365, 9734, 251099.2585, 44540, 96629.0714, 148364, 133060, 41632, 13950, 44938], \"borderColor\": \"rgba(102, 126, 234, 1)\", \"backgroundColor\": \"rgba(102, 126, 234, 0.1)\", \"tension\": 0.4}, {\"label\": \"Credits\", \"data\": [31467, 18000, 39365, 9834, 67027.83, 44540, 28538, 80830.0714, 134415, 41987, 13950, 54938], \"borderColor\": \"rgba(237, 100, 166, 1)\", \"backgroundColor\": \"rgba(237, 100, 166, 0.1)\", \"tension\": 0.4}]}}",
-      "timestamp": 1772761132.810195
-    },
-    {
-      "user": "show me the graph for general ledger",
-      "ai": {
-        "type": "chart",
-        "chartType": "line",
-        "title": "General Ledger - Running Balance",
-        "chartData": {
-          "labels": [
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-04",
-            "2026-04",
-            "2026-04",
-            "2026-04"
-          ],
-          "datasets": [
-            {
-              "label": "Running Balance",
-              "data": [
-                335828643.7536,
-                335828643.7536,
-                335828643.7536,
-                335828543.7536,
-                336012615.1821,
-                336012615.1821,
-                336080706.2535,
-                336148240.1821,
-                336146885.1821,
-                336146530.1821,
-                336146530.1821,
-                336136530.1821
-              ],
-              "borderColor": "rgba(102, 126, 234, 1)",
-              "backgroundColor": "rgba(102, 126, 234, 0.1)",
-              "tension": 0.4,
-              "yAxisID": "y"
-            }
-          ]
-        }
-      },
-      "timestamp": 1772781639.24422
-    },
-    {
-      "user": "show me the credit vs debit chart",
-      "ai": "{\"type\": \"chart\", \"chartType\": \"bar\", \"title\": \"General Ledger - Debits vs Credits\", \"chartData\": {\"labels\": [\"2026-01\", \"2026-01\", \"2026-01\", \"2026-01\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-04\", \"2026-04\", \"2026-04\", \"2026-04\"], \"datasets\": [{\"label\": \"Debits\", \"data\": [31467, 18000, 39365, 9734, 251099.2585, 44540, 96629.0714, 148364, 133060, 41632, 13950, 44938], \"backgroundColor\": \"rgba(102, 126, 234, 0.8)\"}, {\"label\": \"Credits\", \"data\": [31467, 18000, 39365, 9834, 67027.83, 44540, 28538, 80830.0714, 134415, 41987, 13950, 54938], \"backgroundColor\": \"rgba(237, 100, 166, 0.8)\"}]}}",
-      "timestamp": 1772781658.1071942
-    },
-    {
-      "user": "whats are the products in the inventory",
-      "ai": "I couldn't find inventory products from the configured Stock Card/SC pages yet. Please update `PythonAI/scraper_config.json` with your real company base URL and SC/inventory paths.\n\nAttempted URLs:\n- localhost:3000/api\n- localhost:3000/api/\n- reports/inv/sc\n- reports/inv/sc/graph\n- sc",
-      "timestamp": 1772782075.546679
-    },
-    {
-      "user": "whats are the products in the inventory",
-      "ai": "I couldn't find inventory products from the configured Stock Card/SC pages yet. Please update `PythonAI/scraper_config.json` with your real company base URL and SC/inventory paths.\n\nAttempted URLs:\n- https://clone.ulap.biz/\n- https://clone.ulap.biz/reports/inv/sc\n- https://clone.ulap.biz/reports/inv/sc/graph\n- https://clone.ulap.biz/sc\n- https://clone.ulap.biz/stock-card",
-      "timestamp": 1772782103.024805
-    },
-    {
-      "user": "whats are the products in the inventory",
-      "ai": "I couldn't find inventory products from the configured Stock Card/SC pages yet. Please update `PythonAI/scraper_config.json` with your real company base URL and SC/inventory paths.\n\nAttempted URLs:\n- https://clone.ulap.biz/api\n- https://clone.ulap.biz/api/\n- https://clone.ulap.biz/api/reports/inv/sc\n- https://clone.ulap.biz/api/reports/inv/sc/graph\n- https://clone.ulap.biz/api/sc",
-      "timestamp": 1772782135.415614
+      "user": "hello",
+      "ai": "Hello! How can I assist you today?",
+      "timestamp": 1774425625.688514
     },
     {
       "user": "hello",
       "ai": "Hello! I can help with balances, inventory, charts, and financial questions. What would you like to check?",
-      "timestamp": 1772782184.009192
+      "timestamp": 1774496741.5194528
     },
     {
-      "user": "scrape the  https://clone.ulap.biz/api/reports/inv/sc/graph",
-      "ai": "Failed to scrape https://clone.ulap.biz/api/reports/inv/sc/graph: Failed to fetch page",
-      "timestamp": 1772782609.626545
-    },
-    {
-      "user": "where does adam live",
-      "ai": "Lives on the skies",
-      "timestamp": 1772785481.686021
+      "user": "for now i want to check your response capability as i have not connected to the website yet",
+      "ai": "I don't know how to answer that. Feel free to teach me!",
+      "timestamp": 1774496846.461372
     },
     {
       "user": "hello",
       "ai": "Hello! I can help with balances, inventory, charts, and financial questions. What would you like to check?",
-      "timestamp": 1772785504.2157629
+      "timestamp": 1774496858.868434
+    },
+    {
+      "user": "what is the current balance you can access",
+      "ai": "Current inventory from Your Company Name (Last updated: 2026-03-06):\nTotal products: 3\n\n1. Widget A: 150 pcs @ Warehouse 1 [In Stock]\n2. Widget B: 80 pcs @ Warehouse 2 [In Stock]\n3. Gadget X: 25 pcs @ Warehouse 1 [Low Stock]\n\n\u26a0\ufe0f Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json.\n\nDiagnostics:\nUpstream URL: https://clone.ulap.biz/api/reports/inv/sc\nMethod: POST\nStatus: 401\nError: API request failed with status 401\nResponse: Invalid token.",
+      "timestamp": 1774496877.382756
+    },
+    {
+      "user": "what about the inventory?",
+      "ai": "Current inventory from Your Company Name (Last updated: 2026-03-06):\nTotal products: 3\n\n1. Widget A: 150 pcs @ Warehouse 1 [In Stock]\n2. Widget B: 80 pcs @ Warehouse 2 [In Stock]\n3. Gadget X: 25 pcs @ Warehouse 1 [Low Stock]\n\n\u26a0\ufe0f Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json.\n\nDiagnostics:\nUpstream URL: https://clone.ulap.biz/api/reports/inv/sc\nMethod: POST\nStatus: 401\nError: API request failed with status 401\nResponse: Invalid token.",
+      "timestamp": 1774496971.7182631
+    },
+    {
+      "user": "hello what is in the current inventory",
+      "ai": "Hello! I can help with balances, inventory, charts, and financial questions. What would you like to check?",
+      "timestamp": 1774497480.190356
+    },
+    {
+      "user": "what is in the current inventory",
+      "ai": "Current inventory from Your Company Name (Last updated: 2026-03-06):\nTotal products: 3\n\n1. Widget A: 150 pcs @ Warehouse 1 [In Stock]\n2. Widget B: 80 pcs @ Warehouse 2 [In Stock]\n3. Gadget X: 25 pcs @ Warehouse 1 [Low Stock]\n\n\u26a0\ufe0f Web scraping failed. Using fallback data from company_data.json. Please update config/scraper_config.json.\n\nDiagnostics:\nUpstream URL: https://clone.ulap.biz/api/reports/inv/sc\nMethod: POST\nStatus: 401\nError: API request failed with status 401\nResponse: Invalid token.",
+      "timestamp": 1774497494.5463328
+    },
+    {
+      "user": "testing",
+      "ai": "The Wieferich @ Home project searches for Wieferich primes by testing numbers that are one greater than a number with a periodic binary expansion , but up to a \" bit pseudo - length \" of 3500 of the tested binary numbers generated by combination of bit strings with a bit length of up to 24 it has not found a new Wieferich prime.",
+      "timestamp": 1774511574.116245
+    },
+    {
+      "user": "hello",
+      "ai": "Hello! I can help with balances, inventory, charts, and financial questions. What would you like to check?",
+      "timestamp": 1774511588.339817
     },
     {
       "user": "test",
       "ai": "I don't know how to answer that. Feel free to teach me!",
-      "timestamp": 1772785518.579268
+      "timestamp": 1774511597.980576
     },
     {
-      "user": "what is  the current time and date in cauayan city philippines right now",
+      "user": "are there any accounts currently logged in?",
       "ai": "I don't know how to answer that. Feel free to teach me!",
-      "timestamp": 1772785808.923637
+      "timestamp": 1774573552.745235
     },
     {
-      "user": "generate a chart",
-      "ai": {
-        "type": "chart",
-        "chartType": "line",
-        "title": "General Ledger - Running Balance",
-        "chartData": {
-          "labels": [
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-01",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-02",
-            "2026-04",
-            "2026-04",
-            "2026-04",
-            "2026-04"
-          ],
-          "datasets": [
-            {
-              "label": "Running Balance",
-              "data": [
-                335828643.7536,
-                335828643.7536,
-                335828643.7536,
-                335828543.7536,
-                336012615.1821,
-                336012615.1821,
-                336080706.2535,
-                336148240.1821,
-                336146885.1821,
-                336146530.1821,
-                336146530.1821,
-                336136530.1821
-              ],
-              "borderColor": "rgba(102, 126, 234, 1)",
-              "backgroundColor": "rgba(102, 126, 234, 0.1)",
-              "tension": 0.4,
-              "yAxisID": "y"
-            }
-          ]
-        }
-      },
-      "timestamp": 1772785824.294729
+      "user": "are there any accounts logged in?",
+      "ai": "Web scraping is not available. Please install required packages: pip install requests beautifulsoup4",
+      "timestamp": 1774573716.155651
     },
     {
-      "user": "the chart for credit and debit",
-      "ai": "{\"type\": \"chart\", \"chartType\": \"bar\", \"title\": \"General Ledger - Debits vs Credits\", \"chartData\": {\"labels\": [\"2026-01\", \"2026-01\", \"2026-01\", \"2026-01\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-02\", \"2026-04\", \"2026-04\", \"2026-04\", \"2026-04\"], \"datasets\": [{\"label\": \"Debits\", \"data\": [31467, 18000, 39365, 9734, 251099.2585, 44540, 96629.0714, 148364, 133060, 41632, 13950, 44938], \"backgroundColor\": \"rgba(102, 126, 234, 0.8)\"}, {\"label\": \"Credits\", \"data\": [31467, 18000, 39365, 9834, 67027.83, 44540, 28538, 80830.0714, 134415, 41987, 13950, 54938], \"backgroundColor\": \"rgba(237, 100, 166, 0.8)\"}]}}",
-      "timestamp": 1772785870.176794
+      "user": "hello",
+      "ai": "Hello! I can help with balances, inventory, charts, and financial questions. What would you like to check?",
+      "timestamp": 1774578641.772962
     },
     {
-      "user": "whats the current products in the inventory",
-      "ai": "I couldn't find inventory products from the configured Stock Card/SC pages yet. Please update `PythonAI/scraper_config.json` with your real company base URL and SC/inventory paths.\n\nAttempted URLs:\n- https://clone.ulap.biz/api\n- https://clone.ulap.biz/api/\n- https://clone.ulap.biz/api/reports/inv/sc\n- https://clone.ulap.biz/api/reports/inv/sc/graph\n- https://clone.ulap.biz/api/sc",
-      "timestamp": 1772785897.495786
+      "user": "whats currently inside the general ledger",
+      "ai": "Web scraping is not available. Please install required packages: pip install requests beautifulsoup4",
+      "timestamp": 1774578677.941482
     },
     {
-      "user": "show me a scatter chart",
-      "ai": "Current inventory from Your Company Name (Last updated: 2026-03-06):\nTotal products: 3\n\n1. Widget A: 150 pcs @ Warehouse 1 [In Stock]\n2. Widget B: 80 pcs @ Warehouse 2 [In Stock]\n3. Gadget X: 25 pcs @ Warehouse 1 [Low Stock]\n\n\ud83d\udca1 Update company_data.json to refresh this data.",
-      "timestamp": 1773028147.386028
+      "user": "whats currently inside the general ledger",
+      "ai": "I recognized this as a General Ledger data request, but I could not fetch account rows right now. Please verify the site token/cookie and try again.",
+      "timestamp": 1774578734.756775
+    },
+    {
+      "user": "whats currently inside the general ledger",
+      "ai": "I recognized this as a General Ledger data request, but I could not fetch account rows right now. Please verify the site token/cookie and try again.",
+      "timestamp": 1774578911.397164
     }
   ],
   "context": {

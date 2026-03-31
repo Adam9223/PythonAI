@@ -689,7 +689,10 @@ async def chat(
         save_api_keys(api_keys)
         
         # Get AI response
-        response = respond(request.message)
+        auth_context = {
+            "user_auth_token": resolve_site_token(request.user_auth_token)
+        }
+        response = respond(request.message, auth_context=auth_context)
         
         # Handle case where AI cannot answer (returns None)
         if response is None:

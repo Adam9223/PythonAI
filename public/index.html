@@ -49,8 +49,21 @@
                 autocomplete="current-password"
                 required
               />
+              <div class="terms-checkbox">
+                <input type="checkbox" id="termsCheckbox" required />
+                <label for="termsCheckbox">
+                  I agree to the Terms and Conditions
+                </label>
+              </div>
+              <div
+                id="connectedAccountInfo"
+                class="connected-account hidden"
+              ></div>
               <div class="connect-actions">
                 <button type="submit" id="connectSubmitBtn">Connect</button>
+                <button type="button" id="logoutBtn" class="hidden">
+                  Log out
+                </button>
                 <button type="button" id="connectCancelBtn">Cancel</button>
               </div>
             </form>
